@@ -44,7 +44,7 @@ func GetConfigPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	configFile := filepath.Join(dataDir, "config.yaml")
 	return configFile, nil
 }
@@ -55,13 +55,11 @@ func Load() (Config, error) {
 		return DefaultConfig(), err
 	}
 
-	// Ensure config directory exists
 	configDir := filepath.Dir(configPath)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return DefaultConfig(), nil
 	}
 
-	// If config doesn't exist, return defaults
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return DefaultConfig(), nil
 	}
@@ -76,7 +74,6 @@ func Load() (Config, error) {
 		return DefaultConfig(), err
 	}
 
-	// Validate and set defaults for empty fields
 	if cfg.Theme == "" {
 		cfg.Theme = "default"
 	}
@@ -97,7 +94,6 @@ func Save(cfg Config) error {
 		return err
 	}
 
-	// Create config directory if it doesn't exist
 	configDir := filepath.Dir(configPath)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)

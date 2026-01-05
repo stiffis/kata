@@ -8,13 +8,13 @@ import (
 )
 
 type Session struct {
-	ID        int
-	Text      string
-	WPM       float64
-	Accuracy  float64
-	Duration  float64
+	ID         int
+	Text       string
+	WPM        float64
+	Accuracy   float64
+	Duration   float64
 	ErrorCount int
-	Timestamp time.Time
+	Timestamp  time.Time
 }
 
 type KeyStat struct {
@@ -122,14 +122,12 @@ func (db *DB) Close() error {
 	return db.conn.Close()
 }
 
-// AnalyzeErrors compares user input with target text and returns analysis of errors
 func AnalyzeErrors(target, input string) ErrorAnalysis {
 	analysis := ErrorAnalysis{
 		CharErrors:   make(map[string]int),
 		BigramErrors: make(map[string]int),
 	}
 
-	// Compare character by character
 	minLen := len(input)
 	if minLen > len(target) {
 		minLen = len(target)
@@ -140,10 +138,8 @@ func AnalyzeErrors(target, input string) ErrorAnalysis {
 		inputChar := string(input[i])
 
 		if targetChar != inputChar {
-			// Record character error
 			analysis.CharErrors[targetChar]++
 
-			// Record bigram error if possible
 			if i > 0 {
 				bigram := string(target[i-1]) + targetChar
 				analysis.BigramErrors[bigram]++
@@ -154,24 +150,25 @@ func AnalyzeErrors(target, input string) ErrorAnalysis {
 	return analysis
 }
 
-// UpdateKeyStats updates the database with errors and successes for each character
 func (db *DB) UpdateKeyStats(target, input string) error {
-	minLen := len(input)
-	if minLen > len(target) {
-		minLen = len(target)
+	minLen := len([]rune(input))
+	targetRunes := []rune(target)
+	inputRunes := []rune(input)
+
+	if minLen > len(targetRunes) {
+		minLen = len(targetRunes)
 	}
 
-	// Track all characters typed
 	charStats := make(map[string]struct {
 		errors    int
 		successes int
 	})
 
 	for i := 0; i < minLen; i++ {
-		key := string(target[i])
+		key := string(targetRunes[i])
 		stats := charStats[key]
 
-		if target[i] == input[i] {
+		if targetRunes[i] == inputRunes[i] {
 			stats.successes++
 		} else {
 			stats.errors++
@@ -180,14 +177,35 @@ func (db *DB) UpdateKeyStats(target, input string) error {
 		charStats[key] = stats
 	}
 
-	// Update database
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	query := `
+	INSERT INTO key_stats (key, errors, successes, last_practiced)
+	VALUES (?, ?, ?, ?)
+	ON CONFLICT(key) DO UPDATE SET
+		errors = errors + ?,
+		successes = successes + ?,
+		last_practiced = ?
+	`
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	now := time.Now()
 	for key, stats := range charStats {
-		if err := db.upsertKeyStats(key, stats.errors, stats.successes); err != nil {
+		_, err := stmt.Exec(key, stats.errors, stats.successes, now, stats.errors, stats.successes, now)
+		if err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (db *DB) upsertKeyStats(key string, errors, successes int) error {
@@ -204,7 +222,6 @@ func (db *DB) upsertKeyStats(key string, errors, successes int) error {
 	return err
 }
 
-// GetWeakestKeys returns the keys with the highest error rate
 func (db *DB) GetWeakestKeys(limit int) ([]KeyStat, error) {
 	query := `
 	SELECT key, errors, successes, last_practiced
@@ -231,7 +248,6 @@ func (db *DB) GetWeakestKeys(limit int) ([]KeyStat, error) {
 	return stats, nil
 }
 
-// GetAllKeyStats returns all key statistics
 func (db *DB) GetAllKeyStats() ([]KeyStat, error) {
 	query := `
 	SELECT key, errors, successes, last_practiced
@@ -256,7 +272,6 @@ func (db *DB) GetAllKeyStats() ([]KeyStat, error) {
 	return stats, nil
 }
 
-// GetSessionsForGraph returns sessions for graphing (limited and ordered)
 func (db *DB) GetSessionsForGraph(limit int) ([]Session, error) {
 	query := `
 	SELECT id, text, wpm, accuracy, duration, error_count, timestamp
