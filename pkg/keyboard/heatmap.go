@@ -8,7 +8,6 @@ import (
 	"kata/pkg/stats"
 )
 
-// QWERTY keyboard layout
 var keyboardLayout = [][]string{
 	{"`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="},
 	{"q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "[", "]", "\\"},
@@ -16,25 +15,21 @@ var keyboardLayout = [][]string{
 	{"z", "x", "c", "v", "b", "n", "m", ",", ".", "/"},
 }
 
-// GetErrorRate returns error rate for a key (0.0 to 1.0)
-func GetErrorRate(key string, keyStats []stats.KeyStat) float64 {
+func GetErrorRate(key string, keyStats []stats.KeyStat) (float64, bool) {
 	for _, stat := range keyStats {
 		if strings.ToLower(stat.Key) == strings.ToLower(key) {
 			total := stat.Errors + stat.Successes
 			if total == 0 {
-				return 0
+				return 0, false
 			}
-			return float64(stat.Errors) / float64(total)
+			return float64(stat.Errors) / float64(total), true
 		}
 	}
-	return 0
+	return 0, false
 }
 
-// GetColorForRate returns a lipgloss color based on error rate
 func GetColorForRate(rate float64) lipgloss.Color {
-	if rate == 0 {
-		return lipgloss.Color("240") // Gray - no data
-	} else if rate < 0.05 {
+	if rate < 0.05 {
 		return lipgloss.Color("#a6e3a1") // Green - excellent
 	} else if rate < 0.15 {
 		return lipgloss.Color("#94e2d5") // Teal - good
@@ -47,15 +42,12 @@ func GetColorForRate(rate float64) lipgloss.Color {
 	}
 }
 
-// RenderHeatmap creates an ASCII heatmap of the keyboard
 func RenderHeatmap(keyStats []stats.KeyStat, theme lipgloss.Style) string {
 	var b strings.Builder
 
 	b.WriteString("\n")
-	
-	// Render each row
+
 	for rowIdx, row := range keyboardLayout {
-		// Add indentation for proper keyboard shape
 		indent := ""
 		if rowIdx == 1 {
 			indent = "  "
@@ -64,24 +56,28 @@ func RenderHeatmap(keyStats []stats.KeyStat, theme lipgloss.Style) string {
 		} else if rowIdx == 3 {
 			indent = "      "
 		}
-		
+
 		b.WriteString(indent)
-		
+
 		for _, key := range row {
-			rate := GetErrorRate(key, keyStats)
-			color := GetColorForRate(rate)
-			style := lipgloss.NewStyle().Foreground(color)
-			
-			// Format key display
+			rate, hasData := GetErrorRate(key, keyStats)
+
+			var style lipgloss.Style
+			if !hasData {
+				style = lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Gray - no data
+			} else {
+				color := GetColorForRate(rate)
+				style = lipgloss.NewStyle().Foreground(color)
+			}
+
 			keyDisplay := fmt.Sprintf(" %s ", key)
 			b.WriteString(style.Render(keyDisplay))
 		}
 		b.WriteString("\n")
 	}
-	
+
 	b.WriteString("\n")
-	
-	// Legend
+
 	b.WriteString("  Legend: ")
 	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Render("●") + " <5%  ")
 	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#94e2d5")).Render("●") + " <15%  ")
@@ -94,19 +90,24 @@ func RenderHeatmap(keyStats []stats.KeyStat, theme lipgloss.Style) string {
 	return b.String()
 }
 
-// RenderCompactHeatmap creates a more compact version
 func RenderCompactHeatmap(keyStats []stats.KeyStat) string {
 	var b strings.Builder
 
 	for rowIdx, row := range keyboardLayout {
 		indent := strings.Repeat(" ", rowIdx)
 		b.WriteString(indent)
-		
+
 		for _, key := range row {
-			rate := GetErrorRate(key, keyStats)
-			color := GetColorForRate(rate)
-			style := lipgloss.NewStyle().Foreground(color).Bold(true)
-			
+			rate, hasData := GetErrorRate(key, keyStats)
+
+			var style lipgloss.Style
+			if !hasData {
+				style = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+			} else {
+				color := GetColorForRate(rate)
+				style = lipgloss.NewStyle().Foreground(color).Bold(true)
+			}
+
 			b.WriteString(style.Render("█"))
 		}
 		b.WriteString("\n")
@@ -114,3 +115,4 @@ func RenderCompactHeatmap(keyStats []stats.KeyStat) string {
 
 	return b.String()
 }
+

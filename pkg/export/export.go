@@ -11,10 +11,10 @@ import (
 )
 
 type ExportData struct {
-	ExportDate    time.Time         `json:"export_date"`
-	AverageWPM    float64           `json:"average_wpm"`
-	Sessions      []stats.Session   `json:"sessions"`
-	KeyStatistics []stats.KeyStat   `json:"key_statistics"`
+	ExportDate    time.Time       `json:"export_date"`
+	AverageWPM    float64         `json:"average_wpm"`
+	Sessions      []stats.Session `json:"sessions"`
+	KeyStatistics []stats.KeyStat `json:"key_statistics"`
 }
 
 func ToJSON(db *stats.DB, outputFile string) error {
@@ -50,13 +50,11 @@ func ToCSV(db *stats.DB, outputFile string) error {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// Write header
 	header := []string{"ID", "Timestamp", "WPM", "Accuracy", "Duration", "ErrorCount"}
 	if err := writer.Write(header); err != nil {
 		return fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
-	// Write sessions
 	for _, s := range sessions {
 		record := []string{
 			fmt.Sprintf("%d", s.ID),
@@ -79,20 +77,17 @@ func gatherData(db *stats.DB) (ExportData, error) {
 		ExportDate: time.Now(),
 	}
 
-	// Get average WPM
 	avgWPM, err := db.GetAverageWPM()
 	if err == nil {
 		data.AverageWPM = avgWPM
 	}
 
-	// Get all sessions
 	sessions, err := db.GetRecentSessions(1000)
 	if err != nil {
 		return data, fmt.Errorf("failed to get sessions: %w", err)
 	}
 	data.Sessions = sessions
 
-	// Get all key statistics
 	keyStats, err := db.GetAllKeyStats()
 	if err != nil {
 		return data, fmt.Errorf("failed to get key stats: %w", err)

@@ -45,7 +45,7 @@ type WeakKey struct {
 func New() *Generator {
 	return &Generator{
 		rand:     rand.New(rand.NewSource(time.Now().UnixNano())),
-		Language: LangGo, // Default
+		Language: LangGo,
 	}
 }
 
@@ -53,9 +53,25 @@ func (g *Generator) SetLanguage(lang Language) {
 	g.Language = lang
 }
 
-// Data repositories
-var commonBigrams = []string{
+var bigramsEnglish = []string{
 	"th", "he", "in", "er", "an", "re", "on", "at", "en", "nd", "ti", "es", "or", "te", "of", "ed", "is", "it", "al", "ar", "st", "to", "nt", "ng", "se", "ha", "as", "ou", "io", "le", "ve", "me", "ea", "hi", "ne", "de", "ra", "co",
+}
+
+var bigramsSpanish = []string{
+	"de", "es", "en", "el", "la", "os", "ar", "ue", "ra", "re", "er", "as", "ad", "al", "or", "ta", "co", "io", "on", "an", "ci", "nt", "st", "me", "en", "te", "is", "ie", "do", "un", "ue", "ro", "ci", "si", "tr", "ni", "se", "ca", "ba",
+}
+
+var bigramsFrench = []string{
+	"es", "le", "de", "re", "en", "on", "nt", "er", "te", "et", "el", "an", "ai", "it", "me", "ou", "em", "ie", "un", "ti", "ra", "ns", "la", "ur", "is", "ec", "ve", "ar", "as", "il", "pa", "ss", "eu", "si", "sa", "in", "no", "lu", "nc",
+}
+
+var bigramsGerman = []string{
+	"en", "er", "ch", "te", "de", "nd", "ei", "ie", "in", "es", "an", "re", "he", "un", "st", "be", "ge", "ar", "au", "sc", "ne", "sc", "ng", "ra", "li", "ic", "or", "ss", "da", "it", "is", "el", "ha", "em", "rt", "ig", "ro", "ue", "th",
+}
+
+// For programming languages, we keep a "code-like" bigram set
+var bigramsCode = []string{
+	"if", "in", "er", "re", "on", "at", "en", "is", "st", "or", "it", "to", "nt", "ng", "co", "de", "th", "he", "fu", "nc", "ct", "ti", "io", "ur", "rn", "rr", "ni", "il", "pa", "ac", "ck", "ka", "ag", "ge", "tr", "ru", "uc", "ty", "pe",
 }
 
 var spanishWords = []string{
@@ -248,7 +264,18 @@ var pythonSymbols = []string{
 func (g *Generator) GenerateLesson(lessonType LessonType, length int) string {
 	switch lessonType {
 	case TypeBigrams:
-		return g.generateFromList(commonBigrams, length, " ")
+		switch g.Language {
+		case LangSpanish:
+			return g.generateFromList(bigramsSpanish, length, " ")
+		case LangFrench:
+			return g.generateFromList(bigramsFrench, length, " ")
+		case LangGerman:
+			return g.generateFromList(bigramsGerman, length, " ")
+		case LangGo, LangPython, LangCpp, LangJavascript, LangRust:
+			return g.generateFromList(bigramsCode, length, " ")
+		default: // English
+			return g.generateFromList(bigramsEnglish, length, " ")
+		}
 	case TypeWords:
 		switch g.Language {
 		case LangSpanish:
@@ -294,7 +321,6 @@ func (g *Generator) GenerateLesson(lessonType LessonType, length int) string {
 		case LangRust:
 			return g.generateCode(rustSnippets, length)
 		case LangSpanish, LangEnglish, LangFrench, LangGerman:
-			// For natural languages, return longer word sequences
 			var pool []string
 			if g.Language == LangSpanish {
 				pool = spanishWords
@@ -338,13 +364,11 @@ func (g *Generator) generateCode(snippets []string, count int) string {
 	return strings.Join(result, "\n\n")
 }
 
-// GenerateWeaknessLesson creates a lesson focused on weak keys
 func (g *Generator) GenerateWeaknessLesson(weakKeys []WeakKey, length int) string {
 	if len(weakKeys) == 0 {
 		return g.GenerateLesson(TypeWords, length)
 	}
 
-	// Determine word pool based on language
 	var sourcePool []string
 	switch g.Language {
 	case LangSpanish:
@@ -367,11 +391,9 @@ func (g *Generator) GenerateWeaknessLesson(weakKeys []WeakKey, length int) strin
 		sourcePool = append(goKeywords, goSymbols...)
 	}
 
-	// Build a pool of words containing weak keys
 	var wordPool []string
 	seen := make(map[string]bool)
 
-	// For each weak key, find words/bigrams that contain it
 	for _, weak := range weakKeys {
 		for _, word := range sourcePool {
 			if strings.Contains(word, weak.Key) && !seen[word] {
@@ -379,9 +401,22 @@ func (g *Generator) GenerateWeaknessLesson(weakKeys []WeakKey, length int) strin
 				seen[word] = true
 			}
 		}
-		
-		// Always try bigrams too as fallback
-		for _, bigram := range commonBigrams {
+
+		var bigramPool []string
+		switch g.Language {
+		case LangSpanish:
+			bigramPool = bigramsSpanish
+		case LangFrench:
+			bigramPool = bigramsFrench
+		case LangGerman:
+			bigramPool = bigramsGerman
+		case LangEnglish:
+			bigramPool = bigramsEnglish
+		default:
+			bigramPool = bigramsCode
+		}
+
+		for _, bigram := range bigramPool {
 			if strings.Contains(bigram, weak.Key) && !seen[bigram] {
 				wordPool = append(wordPool, bigram)
 				seen[bigram] = true
@@ -389,12 +424,10 @@ func (g *Generator) GenerateWeaknessLesson(weakKeys []WeakKey, length int) strin
 		}
 	}
 
-	// If pool is still empty or too small, add some random words
 	if len(wordPool) < 5 {
 		wordPool = append(wordPool, sourcePool...)
 	}
 
-	// Generate lesson
 	var result []string
 	for i := 0; i < length; i++ {
 		result = append(result, wordPool[g.rand.Intn(len(wordPool))])

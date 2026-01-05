@@ -11,7 +11,6 @@ func TestEngineTyping(t *testing.T) {
 	target := "hello world"
 	e := New(target)
 
-	// Simulate typing "hello"
 	for _, char := range "hello" {
 		e.ProcessKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}})
 	}
@@ -24,7 +23,6 @@ func TestEngineTyping(t *testing.T) {
 		t.Error("Engine should not be finished yet")
 	}
 
-	// Type the rest
 	for _, char := range " world" {
 		e.ProcessKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}})
 	}
@@ -38,7 +36,6 @@ func TestEngineErrors(t *testing.T) {
 	target := "hello"
 	e := New(target)
 
-	// Type "hella" (one error)
 	for _, char := range "hella" {
 		e.ProcessKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}})
 	}
@@ -50,7 +47,7 @@ func TestEngineErrors(t *testing.T) {
 
 func TestDeleteLastWord(t *testing.T) {
 	e := New("test")
-	
+
 	cases := []struct {
 		input    string
 		expected string
@@ -73,18 +70,19 @@ func TestDeleteLastWord(t *testing.T) {
 func TestStatsCalculation(t *testing.T) {
 	target := "abcde" // 5 chars = 1 standard word
 	e := New(target)
-	
+
 	e.StartTime = time.Now().Add(-60 * time.Second)
 	e.EndTime = time.Now()
 	e.IsFinished = true
-	
+
 	wpm, accuracy, _ := e.GetStats()
-	
+
 	if wpm < 0.9 || wpm > 1.1 {
 		t.Errorf("Expected ~1 WPM for 5 chars in 60s, got %f", wpm)
 	}
-	
+
 	if accuracy != 100.0 {
 		t.Errorf("Expected 100%% accuracy, got %f", accuracy)
 	}
 }
+
