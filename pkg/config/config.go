@@ -9,28 +9,43 @@ import (
 )
 
 type Config struct {
-	Theme   string `yaml:"theme"`
-	ZenMode bool   `yaml:"zen_mode"`
-	DBPath  string `yaml:"db_path"`
+	Theme    string `yaml:"theme"`
+	Language string `yaml:"language"`
+	ZenMode  bool   `yaml:"zen_mode"`
+	DBPath   string `yaml:"db_path"`
 }
 
-func DefaultConfig() Config {
-	return Config{
-		Theme:   "default",
-		ZenMode: false,
-		DBPath:  "kata.db",
-	}
-}
-
-func GetConfigPath() (string, error) {
+func GetDataDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
+	return filepath.Join(homeDir, ".kata"), nil
+}
+
+func DefaultConfig() Config {
+	dataDir, _ := GetDataDir()
+	// Fallback to local if home dir fails
+	dbPath := "kata.db"
+	if dataDir != "" {
+		dbPath = filepath.Join(dataDir, "kata.db")
+	}
+
+	return Config{
+		Theme:    "default",
+		Language: "go",
+		ZenMode:  false,
+		DBPath:   dbPath,
+	}
+}
+
+func GetConfigPath() (string, error) {
+	dataDir, err := GetDataDir()
+	if err != nil {
+		return "", err
+	}
 	
-	configDir := filepath.Join(homeDir, ".config", "kata")
-	configFile := filepath.Join(configDir, "config.yaml")
-	
+	configFile := filepath.Join(dataDir, "config.yaml")
 	return configFile, nil
 }
 
@@ -38,6 +53,12 @@ func Load() (Config, error) {
 	configPath, err := GetConfigPath()
 	if err != nil {
 		return DefaultConfig(), err
+	}
+
+	// Ensure config directory exists
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return DefaultConfig(), nil
 	}
 
 	// If config doesn't exist, return defaults
@@ -59,8 +80,12 @@ func Load() (Config, error) {
 	if cfg.Theme == "" {
 		cfg.Theme = "default"
 	}
+	if cfg.Language == "" {
+		cfg.Language = "go"
+	}
 	if cfg.DBPath == "" {
-		cfg.DBPath = "kata.db"
+		def := DefaultConfig()
+		cfg.DBPath = def.DBPath
 	}
 
 	return cfg, nil
