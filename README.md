@@ -52,7 +52,7 @@ Based on the **Monkeytype** aesthetic and powered by **Go**, KATA is designed fo
 Ensure you have Go installed and run:
 
 ```bash
-git clone https://github.com/your-username/kata.git
+git clone https://github.com/stiffis/kata.git
 cd kata
 chmod +x install.sh
 ./install.sh
@@ -72,4 +72,3 @@ Now, simply type `kata` in your terminal.
 This project is licensed under the **GPL-3.0 License**. See the [LICENSE](LICENSE) file for more details.
 
 ---
-
