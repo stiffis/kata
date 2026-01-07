@@ -37,7 +37,7 @@ func (e *Engine) ProcessKey(msg tea.KeyMsg) {
 		if len(e.UserInput) > 0 {
 			e.UserInput = e.UserInput[:len(e.UserInput)-1]
 		}
-	case "ctrl+backspace", "ctrl+h":
+	case "ctrl+backspace", "ctrl+h", "ctrl+w":
 		e.UserInput = e.deleteLastWord(e.UserInput)
 	case "enter":
 		e.UserInput = append(e.UserInput, '\n')
