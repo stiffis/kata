@@ -541,7 +541,11 @@ func (m model) renderMenu() string {
 	b.WriteString("\n")
 	b.WriteString(m.theme.Dim.Render("↑/↓ or j/k to navigate | Enter to select | q to quit"))
 
-	return b.String()
+	content := b.String()
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+	return content
 }
 
 func (m model) renderThemeSelect() string {
