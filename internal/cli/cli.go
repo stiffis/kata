@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -14,6 +14,120 @@ import (
 	"kata/pkg/generator"
 	"kata/pkg/stats"
 )
+
+// Run executes the CLI with the given arguments
+func Run(args []string) {
+	// Parse CLI flags
+	var (
+		showStats    = false
+		setTheme     = ""
+		enableZen    = false
+		practiceMode = ""
+		practiceFile = ""
+		showHelp     = false
+		exportFormat = ""
+		exportOutput = ""
+	)
+
+	// Simple flag parsing
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "--stats", "-s":
+			showStats = true
+		case "--theme", "-t":
+			if i+1 < len(args) {
+				setTheme = args[i+1]
+				i++
+			}
+		case "--zen", "-z":
+			enableZen = true
+		case "--file", "-f":
+			if i+1 < len(args) {
+				practiceFile = args[i+1]
+				i++
+			}
+		case "export", "e":
+			if i+1 < len(args) {
+				exportFormat = args[i+1]
+				i++
+			}
+			if i+1 < len(args) {
+				exportOutput = args[i+1]
+				i++
+			}
+		case "practice", "p":
+			if i+1 < len(args) {
+				practiceMode = args[i+1]
+				i++
+			}
+		case "--help", "-h", "help":
+			showHelp = true
+		}
+	}
+
+	// Handle --help
+	if showHelp {
+		printHelp()
+		return
+	}
+
+	// Load config
+	cfg, err := config.Load()
+	if err != nil {
+		cfg = config.DefaultConfig()
+	}
+
+	// Handle --theme
+	if setTheme != "" {
+		cfg.Theme = setTheme
+		if err := config.Save(cfg); err != nil {
+			fmt.Printf("Error saving theme: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Theme set to: %s\n", setTheme)
+		return
+	}
+
+	// Handle --zen
+	if enableZen {
+		cfg.ZenMode = true
+		if err := config.Save(cfg); err != nil {
+			fmt.Printf("Error saving zen mode: %v\n", err)
+		}
+	}
+
+	// Handle export
+	if exportFormat != "" {
+		handleExport(exportFormat, exportOutput)
+		return
+	}
+
+	// Handle --stats
+	if showStats {
+		printStats()
+		return
+	}
+
+	// Handle practice mode
+	if practiceMode != "" {
+		runPracticeMode(practiceMode)
+		return
+	}
+
+	// Handle practice from file
+	if practiceFile != "" {
+		runPracticeFromFile(practiceFile)
+		return
+	}
+
+	// Normal interactive mode
+	p := tea.NewProgram(app.New())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error: %v", err)
+		os.Exit(1)
+	}
+}
 
 func printHelp() {
 	help := `🥋 KATA - The Way of the Keyboard
@@ -52,7 +166,6 @@ EXAMPLES:
 }
 
 func printStats() {
-	// Load config to get DB path
 	cfg, _ := config.Load()
 
 	db, err := stats.NewDB(cfg.DBPath)
@@ -65,13 +178,11 @@ func printStats() {
 	fmt.Println("📊 KATA Statistics")
 	fmt.Println()
 
-	// Average WPM
 	avgWPM, err := db.GetAverageWPM()
 	if err == nil && avgWPM > 0 {
 		fmt.Printf("Average WPM: %.0f\n\n", avgWPM)
 	}
 
-	// Recent sessions
 	sessions, err := db.GetRecentSessions(5)
 	if err == nil && len(sessions) > 0 {
 		fmt.Println("Recent Sessions:")
@@ -82,7 +193,6 @@ func printStats() {
 		fmt.Println()
 	}
 
-	// Weakest keys
 	weakKeys, err := db.GetWeakestKeys(5)
 	if err == nil && len(weakKeys) > 0 {
 		fmt.Println("Weakest Keys:")
@@ -106,7 +216,6 @@ func runPracticeMode(mode string) {
 	gen := generator.New()
 	var targetText string
 
-	// Load config for DB path in case we need weaknesses
 	cfg, _ := config.Load()
 
 	switch mode {
@@ -157,7 +266,6 @@ func runPracticeMode(mode string) {
 		os.Exit(1)
 	}
 
-	// Create model with target text and start practice
 	p := tea.NewProgram(app.NewPractice(targetText))
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)
@@ -166,7 +274,6 @@ func runPracticeMode(mode string) {
 }
 
 func handleExport(format, output string) {
-	// Load config to get DB path
 	cfg, _ := config.Load()
 
 	db, err := stats.NewDB(cfg.DBPath)
@@ -176,7 +283,6 @@ func handleExport(format, output string) {
 	}
 	defer db.Close()
 
-	// Set default output filename
 	if output == "" {
 		output = fmt.Sprintf("kata-stats-%s.%s", time.Now().Format("2006-01-02"), format)
 	}
@@ -215,7 +321,6 @@ func runPracticeFromFile(filepath string) {
 		os.Exit(1)
 	}
 
-	// Create model with target text and start practice
 	p := tea.NewProgram(app.NewPractice(targetText))
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)
