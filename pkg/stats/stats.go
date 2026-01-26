@@ -186,6 +186,23 @@ func AnalyzeErrors(target, input string) ErrorAnalysis {
 	return analysis
 }
 
+func accuracyToQuality(accuracy float64) int {
+	switch {
+	case accuracy >= 0.95:
+		return 5
+	case accuracy >= 0.85:
+		return 4
+	case accuracy >= 0.70:
+		return 3
+	case accuracy >= 0.50:
+		return 2
+	case accuracy >= 0.30:
+		return 1
+	default:
+		return 0
+	}
+}
+
 func (db *DB) UpdateKeyStats(target, input string) error {
 	minLen := len([]rune(input))
 	targetRunes := []rune(target)
@@ -235,7 +252,40 @@ func (db *DB) UpdateKeyStats(target, input string) error {
 
 	now := time.Now()
 	for key, stats := range charStats {
-		_, err := stmt.Exec(key, stats.errors, stats.successes, now, stats.errors, stats.successes, now)
+		var existingKey KeyStat
+		err := tx.QueryRow(`
+			SELECT key, errors, successes, last_practiced, interval, repetitions, ease_factor
+			FROM key_stats WHERE key = ?
+		`, key).Scan(&existingKey.Key, &existingKey.Errors, &existingKey.Successes,
+			&existingKey.LastPracticed, &existingKey.Interval, &existingKey.Repetitions, &existingKey.EaseFactor)
+
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+
+		newErrors := existingKey.Errors + stats.errors
+		newSuccesses := existingKey.Successes + stats.successes
+		totalAttempts := newErrors + newSuccesses
+		accuracy := 0.0
+		if totalAttempts > 0 {
+			accuracy = float64(newSuccesses) / float64(totalAttempts)
+		}
+
+		quality := accuracyToQuality(accuracy)
+		existingKey.Errors = newErrors
+		existingKey.Successes = newSuccesses
+		existingKey.UpdateSM2(quality)
+
+		_, err = stmt.Exec(key, stats.errors, stats.successes, now, stats.errors, stats.successes, now)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Exec(`
+			UPDATE key_stats 
+			SET interval = ?, repetitions = ?, ease_factor = ?
+			WHERE key = ?
+		`, existingKey.Interval, existingKey.Repetitions, existingKey.EaseFactor, key)
 		if err != nil {
 			return err
 		}
