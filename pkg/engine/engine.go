@@ -32,6 +32,8 @@ func (e *Engine) ProcessKey(msg tea.KeyMsg) {
 		e.StartTime = time.Now()
 	}
 
+	oldLength := len(e.UserInput)
+
 	switch msg.String() {
 	case "backspace":
 		if len(e.UserInput) > 0 {
@@ -51,8 +53,8 @@ func (e *Engine) ProcessKey(msg tea.KeyMsg) {
 		}
 	}
 
+	e.updateErrorsIncremental(oldLength)
 	e.checkCompletion()
-	e.calculateErrors()
 }
 
 func (e *Engine) checkCompletion() {
@@ -74,14 +76,19 @@ func (e *Engine) checkCompletion() {
 
 func (e *Engine) calculateErrors() {
 	e.ErrorCount = 0
-	checkLength := len(e.UserInput)
-	if checkLength > len(e.TargetText) {
-		checkLength = len(e.TargetText)
+	minLength := len(e.UserInput)
+	if minLength > len(e.TargetText) {
+		minLength = len(e.TargetText)
 	}
-	for i := 0; i < checkLength; i++ {
+
+	for i := 0; i < minLength; i++ {
 		if e.UserInput[i] != e.TargetText[i] {
 			e.ErrorCount++
 		}
+	}
+
+	if len(e.UserInput) > len(e.TargetText) {
+		e.ErrorCount += len(e.UserInput) - len(e.TargetText)
 	}
 }
 
@@ -140,8 +147,16 @@ func (e *Engine) GetStats() (wpm float64, accuracy float64, duration float64) {
 	words := float64(correctChars) / 5.0
 	wpm = (words / duration) * 60.0
 
-	if len(e.TargetText) > 0 {
-		accuracy = float64(len(e.TargetText)-e.ErrorCount) / float64(len(e.TargetText)) * 100.0
+	// Calculate accuracy based on actual attempts made
+	totalAttempts := len(e.UserInput)
+	if totalAttempts == 0 {
+		accuracy = 100.0
+	} else {
+		correctAttempts := totalAttempts - e.ErrorCount
+		if correctAttempts < 0 {
+			correctAttempts = 0
+		}
+		accuracy = float64(correctAttempts) / float64(totalAttempts) * 100.0
 	}
 
 	return wpm, accuracy, duration

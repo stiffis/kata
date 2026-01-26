@@ -107,3 +107,51 @@ func TestWPMWithErrors(t *testing.T) {
 		t.Errorf("Expected ~%.2f WPM (4 correct chars / 5), got %.2f", expectedWPM, wpm)
 	}
 }
+
+func TestAccuracyCalculation(t *testing.T) {
+	cases := []struct {
+		name        string
+		target      string
+		input       string
+		expectedMin float64
+		expectedMax float64
+	}{
+		{
+			name:        "perfect accuracy",
+			target:      "hello",
+			input:       "hello",
+			expectedMin: 99.9,
+			expectedMax: 100.0,
+		},
+		{
+			name:        "one error in five chars",
+			target:      "hello",
+			input:       "hella",
+			expectedMin: 79.9,
+			expectedMax: 80.1,
+		},
+		{
+			name:        "multiple errors",
+			target:      "hello",
+			input:       "hxllo",
+			expectedMin: 79.9,
+			expectedMax: 80.1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := New(tc.target)
+			for _, char := range tc.input {
+				e.ProcessKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}})
+			}
+
+			_, accuracy, _ := e.GetStats()
+
+			if accuracy < tc.expectedMin || accuracy > tc.expectedMax {
+				t.Errorf("Expected accuracy between %.2f%% and %.2f%%, got %.2f%%",
+					tc.expectedMin, tc.expectedMax, accuracy)
+			}
+		})
+	}
+}
