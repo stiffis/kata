@@ -22,6 +22,9 @@ type KeyStat struct {
 	Errors        int
 	Successes     int
 	LastPracticed time.Time
+	Interval      int
+	Repetitions   int
+	EaseFactor    float64
 }
 
 type ErrorAnalysis struct {
@@ -69,6 +72,9 @@ func (db *DB) createTables() error {
 		errors INTEGER DEFAULT 0,
 		successes INTEGER DEFAULT 0,
 		last_practiced DATETIME DEFAULT CURRENT_TIMESTAMP,
+		interval INTEGER DEFAULT 0,
+		repetitions INTEGER DEFAULT 0,
+		ease_factor REAL DEFAULT 2.5,
 		UNIQUE(key)
 	);
 	`
@@ -224,7 +230,7 @@ func (db *DB) upsertKeyStats(key string, errors, successes int) error {
 
 func (db *DB) GetWeakestKeys(limit int) ([]KeyStat, error) {
 	query := `
-	SELECT key, errors, successes, last_practiced
+	SELECT key, errors, successes, last_practiced, interval, repetitions, ease_factor
 	FROM key_stats
 	WHERE (errors + successes) >= 5
 	ORDER BY CAST(errors AS REAL) / (errors + successes) DESC
@@ -239,7 +245,7 @@ func (db *DB) GetWeakestKeys(limit int) ([]KeyStat, error) {
 	var stats []KeyStat
 	for rows.Next() {
 		var s KeyStat
-		if err := rows.Scan(&s.Key, &s.Errors, &s.Successes, &s.LastPracticed); err != nil {
+		if err := rows.Scan(&s.Key, &s.Errors, &s.Successes, &s.LastPracticed, &s.Interval, &s.Repetitions, &s.EaseFactor); err != nil {
 			return nil, err
 		}
 		stats = append(stats, s)
@@ -250,7 +256,7 @@ func (db *DB) GetWeakestKeys(limit int) ([]KeyStat, error) {
 
 func (db *DB) GetAllKeyStats() ([]KeyStat, error) {
 	query := `
-	SELECT key, errors, successes, last_practiced
+	SELECT key, errors, successes, last_practiced, interval, repetitions, ease_factor
 	FROM key_stats
 	ORDER BY (errors + successes) DESC
 	`
@@ -263,7 +269,7 @@ func (db *DB) GetAllKeyStats() ([]KeyStat, error) {
 	var stats []KeyStat
 	for rows.Next() {
 		var s KeyStat
-		if err := rows.Scan(&s.Key, &s.Errors, &s.Successes, &s.LastPracticed); err != nil {
+		if err := rows.Scan(&s.Key, &s.Errors, &s.Successes, &s.LastPracticed, &s.Interval, &s.Repetitions, &s.EaseFactor); err != nil {
 			return nil, err
 		}
 		stats = append(stats, s)
