@@ -218,3 +218,87 @@ func TestGetDueKeys(t *testing.T) {
 		t.Errorf("Expected oldest due key to be 'b', got '%s'", dueKeys[0].Key)
 	}
 }
+
+func TestUpdateKeyStatsWithSRS(t *testing.T) {
+	tmpDB := "/tmp/kata_test_update_srs.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create DB: %v", err)
+	}
+	defer db.Close()
+
+	target := "aaabbb"
+	input := "aaabbb"
+
+	err = db.UpdateKeyStats(target, input)
+	if err != nil {
+		t.Fatalf("UpdateKeyStats failed: %v", err)
+	}
+
+	allStats, err := db.GetAllKeyStats()
+	if err != nil {
+		t.Fatalf("GetAllKeyStats failed: %v", err)
+	}
+
+	if len(allStats) != 2 {
+		t.Fatalf("Expected 2 keys, got %d", len(allStats))
+	}
+
+	for _, stat := range allStats {
+		if stat.Key == "a" || stat.Key == "b" {
+			if stat.Errors != 0 {
+				t.Errorf("Key %s: expected 0 errors, got %d", stat.Key, stat.Errors)
+			}
+			if stat.Successes != 3 {
+				t.Errorf("Key %s: expected 3 successes, got %d", stat.Key, stat.Successes)
+			}
+			if stat.Interval != 1 {
+				t.Errorf("Key %s: expected interval 1 (first correct review), got %d", stat.Key, stat.Interval)
+			}
+			if stat.Repetitions != 1 {
+				t.Errorf("Key %s: expected 1 repetition, got %d", stat.Key, stat.Repetitions)
+			}
+		}
+	}
+
+	err = db.UpdateKeyStats("aaa", "aab")
+	if err != nil {
+		t.Fatalf("UpdateKeyStats second call failed: %v", err)
+	}
+
+	statA, err := db.GetAllKeyStats()
+	if err != nil {
+		t.Fatalf("GetAllKeyStats after second update failed: %v", err)
+	}
+
+	var updatedA *KeyStat
+	for i := range statA {
+		if statA[i].Key == "a" {
+			updatedA = &statA[i]
+			break
+		}
+	}
+
+	if updatedA == nil {
+		t.Fatal("Key 'a' not found after second update")
+	}
+
+	if updatedA.Errors != 1 {
+		t.Errorf("Expected 1 error for 'a', got %d", updatedA.Errors)
+	}
+	if updatedA.Successes != 5 {
+		t.Errorf("Expected 5 successes for 'a', got %d", updatedA.Successes)
+	}
+
+	accuracy := float64(updatedA.Successes) / float64(updatedA.Errors+updatedA.Successes)
+	if accuracy < 0.8 || accuracy > 0.9 {
+		t.Logf("Accuracy for 'a': %.2f (5/6 = 0.83)", accuracy)
+	}
+
+	if updatedA.Interval < 1 {
+		t.Errorf("Expected interval >= 1, got %d", updatedA.Interval)
+	}
+}
