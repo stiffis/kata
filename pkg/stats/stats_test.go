@@ -134,3 +134,87 @@ func TestSM2Algorithm(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDueKeys(t *testing.T) {
+	tmpDB := "/tmp/kata_test_due_keys.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create DB: %v", err)
+	}
+	defer db.Close()
+
+	// Insert test data
+	now := time.Now()
+	testKeys := []struct {
+		key           string
+		errors        int
+		successes     int
+		lastPracticed time.Time
+		interval      int
+	}{
+		{"a", 2, 8, now.Add(-2 * 24 * time.Hour), 1},   // due (1 day interval, practiced 2 days ago)
+		{"b", 1, 9, now.Add(-7 * 24 * time.Hour), 6},   // due (6 day interval, practiced 7 days ago)
+		{"c", 0, 10, now.Add(-1 * time.Hour), 1},       // not due (1 day interval, practiced 1 hour ago)
+		{"d", 5, 5, now.Add(-10 * 24 * time.Hour), 15}, // not due yet (15 day interval, practiced 10 days ago)
+		{"e", 1, 1, now.Add(-3 * 24 * time.Hour), 1},   // only 2 attempts total, should be excluded
+	}
+
+	for _, tk := range testKeys {
+		_, err := db.conn.Exec(`
+			INSERT INTO key_stats (key, errors, successes, last_practiced, interval, repetitions, ease_factor)
+			VALUES (?, ?, ?, ?, ?, 1, 2.5)
+		`, tk.key, tk.errors, tk.successes, tk.lastPracticed, tk.interval)
+		if err != nil {
+			t.Fatalf("Failed to insert test key %s: %v", tk.key, err)
+		}
+	}
+
+	// Get due keys with limit 5
+	dueKeys, err := db.GetDueKeys(5)
+	if err != nil {
+		t.Fatalf("GetDueKeys failed: %v", err)
+	}
+
+	if len(dueKeys) != 2 {
+		t.Errorf("Expected 2 due keys, got %d", len(dueKeys))
+	}
+
+	// Check that we got the correct keys
+	foundA, foundB := false, false
+	for _, ks := range dueKeys {
+		if ks.Key == "a" {
+			foundA = true
+		}
+		if ks.Key == "b" {
+			foundB = true
+		}
+		if ks.Key == "c" || ks.Key == "d" || ks.Key == "e" {
+			t.Errorf("Got unexpected key: %s", ks.Key)
+		}
+	}
+
+	if !foundA {
+		t.Error("Expected to find key 'a' in due keys")
+	}
+	if !foundB {
+		t.Error("Expected to find key 'b' in due keys")
+	}
+
+	// Test with limit 1
+	dueKeys, err = db.GetDueKeys(1)
+	if err != nil {
+		t.Fatalf("GetDueKeys with limit 1 failed: %v", err)
+	}
+
+	if len(dueKeys) != 1 {
+		t.Errorf("Expected 1 due key with limit, got %d", len(dueKeys))
+	}
+
+	// The oldest one should be "b" (practiced 7 days ago)
+	if len(dueKeys) > 0 && dueKeys[0].Key != "b" {
+		t.Errorf("Expected oldest due key to be 'b', got '%s'", dueKeys[0].Key)
+	}
+}
