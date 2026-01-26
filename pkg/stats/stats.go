@@ -284,6 +284,39 @@ func (db *DB) GetWeakestKeys(limit int) ([]KeyStat, error) {
 	return stats, nil
 }
 
+func (db *DB) GetDueKeys(limit int) ([]KeyStat, error) {
+	query := `
+	SELECT key, errors, successes, last_practiced, interval, repetitions, ease_factor
+	FROM key_stats
+	WHERE (errors + successes) >= 3
+	ORDER BY last_practiced ASC
+	`
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	now := time.Now()
+	var stats []KeyStat
+	for rows.Next() {
+		var s KeyStat
+		if err := rows.Scan(&s.Key, &s.Errors, &s.Successes, &s.LastPracticed, &s.Interval, &s.Repetitions, &s.EaseFactor); err != nil {
+			return nil, err
+		}
+
+		daysSince := now.Sub(s.LastPracticed).Hours() / 24
+		if daysSince >= float64(s.Interval) {
+			stats = append(stats, s)
+			if len(stats) >= limit {
+				break
+			}
+		}
+	}
+
+	return stats, nil
+}
+
 func (db *DB) GetAllKeyStats() ([]KeyStat, error) {
 	query := `
 	SELECT key, errors, successes, last_practiced, interval, repetitions, ease_factor
