@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"kata/pkg/config"
@@ -21,8 +22,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+
+		if m.screen == screenStats && !m.statsReady {
+			m.statsViewport = viewport.New(msg.Width, msg.Height-2)
+			m.statsViewport.YPosition = 0
+			m.statsViewport.SetContent(m.buildStatsContent())
+			m.statsReady = true
+		} else if m.screen == screenStats && m.statsReady {
+			m.statsViewport.Width = msg.Width
+			m.statsViewport.Height = msg.Height - 2
+		}
+
 		return m, nil
 	case tea.KeyMsg:
+		if m.screen == screenStats && m.statsReady {
+			var cmd tea.Cmd
+			m.statsViewport, cmd = m.statsViewport.Update(msg)
+
+			switch msg.String() {
+			case "ctrl+c", "q":
+				if m.db != nil {
+					m.db.Close()
+				}
+				return m, tea.Quit
+			case "esc", "enter":
+				m.screen = screenMenu
+				m.statsReady = false
+				return m, nil
+			}
+			return m, cmd
+		}
+
 		switch m.screen {
 		case screenMenu:
 			return m.handleMenuInput(msg)
@@ -86,6 +116,13 @@ func (m model) selectMenuItem() (tea.Model, tea.Cmd) {
 		return m, textinput.Blink
 	case 6: // View Stats
 		m.screen = screenStats
+		m.statsReady = false
+		if m.width > 0 && m.height > 0 {
+			m.statsViewport = viewport.New(m.width, m.height-2)
+			m.statsViewport.YPosition = 0
+			m.statsViewport.SetContent(m.buildStatsContent())
+			m.statsReady = true
+		}
 		return m, nil
 	case 7: // Change Theme
 		m.screen = screenThemeSelect

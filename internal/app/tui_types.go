@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 
 	"kata/pkg/config"
@@ -44,6 +45,10 @@ type model struct {
 	// Window dimensions
 	width  int
 	height int
+
+	// Viewport for stats screen
+	statsViewport viewport.Model
+	statsReady    bool
 
 	generator  *generator.Generator
 	db         *stats.DB

@@ -11,7 +11,7 @@ import (
 	"kata/pkg/keyboard"
 )
 
-func (m model) renderStats() string {
+func (m model) buildStatsContent() string {
 	var b strings.Builder
 
 	b.WriteString(m.theme.Title.Render("📊 Your Statistics"))
@@ -19,28 +19,21 @@ func (m model) renderStats() string {
 
 	if m.db == nil {
 		b.WriteString(m.theme.Incorrect.Render("No database connection available"))
-		b.WriteString("\n\n")
-		b.WriteString(m.theme.Dim.Render("Press ESC to return to menu"))
 		return b.String()
 	}
 
-	// Get terminal width
-	termWidth := 80 // default
+	termWidth := 80
 	if width, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
 		termWidth = width
 	}
 	separator := m.theme.Separator.Render(strings.Repeat("─", termWidth))
 
-	// Get sessions for graphing
 	sessions, err := m.db.GetSessionsForGraph(20)
 	if err != nil || len(sessions) == 0 {
 		b.WriteString(m.theme.Dim.Render("No session data yet. Complete some practice sessions!"))
-		b.WriteString("\n\n")
-		b.WriteString(m.theme.Dim.Render("Press ESC or Enter to return to menu"))
 		return b.String()
 	}
 
-	// WPM Over Time Graph
 	b.WriteString(m.theme.Stats.Render("📈 WPM Progress Over Time:"))
 	b.WriteString("\n")
 
@@ -59,7 +52,6 @@ func (m model) renderStats() string {
 	b.WriteString(separator)
 	b.WriteString("\n\n")
 
-	// Average WPM
 	avgWPM, _ := m.db.GetAverageWPM()
 	if avgWPM > 0 {
 		b.WriteString(m.theme.Stats.Render(fmt.Sprintf("Average WPM: %.0f", avgWPM)))
@@ -68,7 +60,6 @@ func (m model) renderStats() string {
 		b.WriteString("\n\n")
 	}
 
-	// Accuracy sparkline
 	b.WriteString(m.theme.Stats.Render("🎯 Accuracy Trend:"))
 	b.WriteString("\n")
 
@@ -87,13 +78,12 @@ func (m model) renderStats() string {
 	b.WriteString(separator)
 	b.WriteString("\n\n")
 
-	// Weakest Keys Bar Chart
 	weakKeys, err := m.db.GetWeakestKeys(8)
 	if err == nil && len(weakKeys) > 0 {
 		b.WriteString(m.theme.Incorrect.Render("🔥 Your Weakest Keys:"))
 		b.WriteString("\n")
 
-		maxErrors := 1 // Prevent division by zero
+		maxErrors := 1
 		for _, k := range weakKeys {
 			if k.Errors > maxErrors {
 				maxErrors = k.Errors
@@ -106,7 +96,7 @@ func (m model) renderStats() string {
 			}
 			total := k.Errors + k.Successes
 			if total == 0 {
-				continue // Skip if no data
+				continue
 			}
 
 			errorRate := float64(k.Errors) / float64(total) * 100.0
@@ -120,7 +110,6 @@ func (m model) renderStats() string {
 				keyDisplay = "␣"
 			}
 
-			// Create horizontal bar (ensure it's never negative)
 			barLength := int(float64(k.Errors) / float64(maxErrors) * 30)
 			if barLength < 0 {
 				barLength = 0
@@ -157,7 +146,6 @@ func (m model) renderStats() string {
 		b.WriteString("\n")
 	}
 
-	// Recent sessions mini summary
 	recentSessions, _ := m.db.GetRecentSessions(3)
 	if len(recentSessions) > 0 {
 		b.WriteString("\n")
@@ -178,7 +166,6 @@ func (m model) renderStats() string {
 		}
 	}
 
-	// Keyboard Heatmap
 	allKeyStats, err := m.db.GetAllKeyStats()
 	if err == nil && len(allKeyStats) > 0 {
 		b.WriteString("\n")
@@ -190,8 +177,18 @@ func (m model) renderStats() string {
 		b.WriteString(heatmap)
 	}
 
+	return b.String()
+}
+
+func (m model) renderStats() string {
+	if !m.statsReady {
+		return m.theme.Dim.Render("Loading stats...\n\nPress ESC or Enter to return to menu")
+	}
+
+	var b strings.Builder
+	b.WriteString(m.statsViewport.View())
 	b.WriteString("\n")
-	b.WriteString(m.theme.Dim.Render("Press ESC or Enter to return to menu"))
+	b.WriteString(m.theme.Dim.Render("j/k or ↑/↓: Scroll | d/u: Half page | ESC/Enter: Menu"))
 
 	return b.String()
 }
