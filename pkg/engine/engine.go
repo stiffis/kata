@@ -76,10 +76,7 @@ func (e *Engine) checkCompletion() {
 
 func (e *Engine) calculateErrors() {
 	e.ErrorCount = 0
-	minLength := len(e.UserInput)
-	if minLength > len(e.TargetText) {
-		minLength = len(e.TargetText)
-	}
+	minLength := min(len(e.UserInput), len(e.TargetText))
 
 	for i := 0; i < minLength; i++ {
 		if e.UserInput[i] != e.TargetText[i] {
@@ -163,10 +160,7 @@ func (e *Engine) GetStats() (wpm float64, accuracy float64, duration float64) {
 
 	// Calculate WPM based on correct characters typed, not total target length
 	// Standard: 1 word = 5 characters
-	correctChars := len(e.TargetText) - e.ErrorCount
-	if correctChars < 0 {
-		correctChars = 0
-	}
+	correctChars := max(0, len(e.TargetText)-e.ErrorCount)
 	words := float64(correctChars) / 5.0
 	wpm = (words / duration) * 60.0
 
@@ -175,10 +169,7 @@ func (e *Engine) GetStats() (wpm float64, accuracy float64, duration float64) {
 	if totalAttempts == 0 {
 		accuracy = 100.0
 	} else {
-		correctAttempts := totalAttempts - e.ErrorCount
-		if correctAttempts < 0 {
-			correctAttempts = 0
-		}
+		correctAttempts := max(0, totalAttempts-e.ErrorCount)
 		accuracy = float64(correctAttempts) / float64(totalAttempts) * 100.0
 	}
 
