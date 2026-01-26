@@ -131,7 +131,13 @@ func (e *Engine) GetStats() (wpm float64, accuracy float64, duration float64) {
 		duration = 1 // minimal duration
 	}
 
-	words := float64(len(e.TargetText)) / 5.0
+	// Calculate WPM based on correct characters typed, not total target length
+	// Standard: 1 word = 5 characters
+	correctChars := len(e.TargetText) - e.ErrorCount
+	if correctChars < 0 {
+		correctChars = 0
+	}
+	words := float64(correctChars) / 5.0
 	wpm = (words / duration) * 60.0
 
 	if len(e.TargetText) > 0 {
@@ -140,4 +146,3 @@ func (e *Engine) GetStats() (wpm float64, accuracy float64, duration float64) {
 
 	return wpm, accuracy, duration
 }
-
