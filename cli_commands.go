@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"kata/internal/app"
 	"kata/pkg/config"
 	"kata/pkg/export"
 	"kata/pkg/generator"
@@ -157,11 +158,7 @@ func runPracticeMode(mode string) {
 	}
 
 	// Create model with target text and start practice
-	m := initialModel()
-	m.targetText = targetText
-	m.startPractice()
-
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(app.NewPractice(targetText))
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)
@@ -219,11 +216,7 @@ func runPracticeFromFile(filepath string) {
 	}
 
 	// Create model with target text and start practice
-	m := initialModel()
-	m.targetText = targetText
-	m.startPractice()
-
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(app.NewPractice(targetText))
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)
