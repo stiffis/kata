@@ -752,6 +752,20 @@ func (m model) renderStats() string {
 		b.WriteString("\n")
 	}
 
+	dueKeys, err := m.db.GetDueKeys(100)
+	if err == nil {
+		b.WriteString("\n")
+		dueCount := len(dueKeys)
+		if dueCount > 0 {
+			b.WriteString(m.theme.Stats.Render(fmt.Sprintf("🔄 Keys Due for Review: %d", dueCount)))
+		} else {
+			b.WriteString(m.theme.Dim.Render("🔄 No keys due for review - great job! 🎉"))
+		}
+		b.WriteString("\n")
+		b.WriteString(separator)
+		b.WriteString("\n")
+	}
+
 	// Recent sessions mini summary
 	recentSessions, _ := m.db.GetRecentSessions(3)
 	if len(recentSessions) > 0 {
