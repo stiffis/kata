@@ -109,7 +109,38 @@ func (db *DB) createTables() error {
 	);
 	`
 	_, err := db.conn.Exec(query)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return db.migrateSchema()
+}
+
+func (db *DB) migrateSchema() error {
+	var count int
+	err := db.conn.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info('key_stats') 
+		WHERE name='interval'
+	`).Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		migrations := []string{
+			`ALTER TABLE key_stats ADD COLUMN interval INTEGER DEFAULT 0`,
+			`ALTER TABLE key_stats ADD COLUMN repetitions INTEGER DEFAULT 0`,
+			`ALTER TABLE key_stats ADD COLUMN ease_factor REAL DEFAULT 2.5`,
+		}
+
+		for _, migration := range migrations {
+			if _, err := db.conn.Exec(migration); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (db *DB) SaveSession(session Session) error {
