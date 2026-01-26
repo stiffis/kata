@@ -18,7 +18,7 @@ fi
 
 # 2. Compilar el proyecto
 echo -e "🔨 Compilando KATA..."
-go build -o kata .
+go build -o kata ./cmd/kata
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}❌ Error en la compilación.${NC}"
