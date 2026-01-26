@@ -113,7 +113,27 @@ func (db *DB) createTables() error {
 		return err
 	}
 
+	if err := db.createIndexes(); err != nil {
+		return err
+	}
+
 	return db.migrateSchema()
+}
+
+func (db *DB) createIndexes() error {
+	indexes := []string{
+		`CREATE INDEX IF NOT EXISTS idx_sessions_timestamp ON sessions(timestamp DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_key_stats_last_practiced ON key_stats(last_practiced ASC)`,
+		`CREATE INDEX IF NOT EXISTS idx_key_stats_attempts ON key_stats((errors + successes) DESC)`,
+	}
+
+	for _, index := range indexes {
+		if _, err := db.conn.Exec(index); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (db *DB) migrateSchema() error {
