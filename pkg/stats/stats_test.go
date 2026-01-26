@@ -1,6 +1,8 @@
 package stats
 
 import (
+	"database/sql"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -300,5 +302,449 @@ func TestUpdateKeyStatsWithSRS(t *testing.T) {
 
 	if updatedA.Interval < 1 {
 		t.Errorf("Expected interval >= 1, got %d", updatedA.Interval)
+	}
+}
+
+func TestSaveSession(t *testing.T) {
+	tmpDB := "/tmp/kata_test_save_session.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create DB: %v", err)
+	}
+	defer db.Close()
+
+	session := Session{
+		Text:       "hello world",
+		WPM:        45.5,
+		Accuracy:   92.3,
+		Duration:   60.0,
+		ErrorCount: 3,
+		Timestamp:  time.Now(),
+	}
+
+	err = db.SaveSession(session)
+	if err != nil {
+		t.Fatalf("SaveSession failed: %v", err)
+	}
+
+	sessions, err := db.GetRecentSessions(1)
+	if err != nil {
+		t.Fatalf("GetRecentSessions failed: %v", err)
+	}
+
+	if len(sessions) != 1 {
+		t.Fatalf("Expected 1 session, got %d", len(sessions))
+	}
+
+	s := sessions[0]
+	if s.Text != "hello world" {
+		t.Errorf("Expected text 'hello world', got '%s'", s.Text)
+	}
+	if s.WPM != 45.5 {
+		t.Errorf("Expected WPM 45.5, got %.1f", s.WPM)
+	}
+	if s.Accuracy != 92.3 {
+		t.Errorf("Expected accuracy 92.3, got %.1f", s.Accuracy)
+	}
+	if s.Duration != 60.0 {
+		t.Errorf("Expected duration 60.0, got %.1f", s.Duration)
+	}
+	if s.ErrorCount != 3 {
+		t.Errorf("Expected error count 3, got %d", s.ErrorCount)
+	}
+}
+
+func TestGetRecentSessions(t *testing.T) {
+	tmpDB := "/tmp/kata_test_recent_sessions.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create DB: %v", err)
+	}
+	defer db.Close()
+
+	now := time.Now()
+	for i := 0; i < 5; i++ {
+		session := Session{
+			Text:       "test",
+			WPM:        float64(40 + i*5),
+			Accuracy:   90.0,
+			Duration:   60.0,
+			ErrorCount: i,
+			Timestamp:  now.Add(time.Duration(i) * time.Minute),
+		}
+		if err := db.SaveSession(session); err != nil {
+			t.Fatalf("SaveSession %d failed: %v", i, err)
+		}
+	}
+
+	sessions, err := db.GetRecentSessions(3)
+	if err != nil {
+		t.Fatalf("GetRecentSessions failed: %v", err)
+	}
+
+	if len(sessions) != 3 {
+		t.Fatalf("Expected 3 sessions, got %d", len(sessions))
+	}
+
+	if sessions[0].WPM < sessions[1].WPM {
+		t.Error("Sessions should be ordered DESC by timestamp (most recent first)")
+	}
+
+	if sessions[0].ErrorCount != 4 {
+		t.Errorf("Most recent session should have 4 errors, got %d", sessions[0].ErrorCount)
+	}
+}
+
+func TestGetSessionsForGraph(t *testing.T) {
+	tmpDB := "/tmp/kata_test_graph_sessions.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create DB: %v", err)
+	}
+	defer db.Close()
+
+	now := time.Now()
+	for i := 0; i < 10; i++ {
+		session := Session{
+			Text:       "test",
+			WPM:        float64(30 + i*2),
+			Accuracy:   85.0 + float64(i),
+			Duration:   60.0,
+			ErrorCount: i,
+			Timestamp:  now.Add(time.Duration(i) * time.Minute),
+		}
+		if err := db.SaveSession(session); err != nil {
+			t.Fatalf("SaveSession %d failed: %v", i, err)
+		}
+	}
+
+	sessions, err := db.GetSessionsForGraph(5)
+	if err != nil {
+		t.Fatalf("GetSessionsForGraph failed: %v", err)
+	}
+
+	if len(sessions) != 5 {
+		t.Fatalf("Expected 5 sessions, got %d", len(sessions))
+	}
+
+	if sessions[0].WPM > sessions[1].WPM {
+		t.Error("Sessions should be ordered ASC by timestamp (oldest first)")
+	}
+
+	if sessions[0].WPM != 30.0 {
+		t.Errorf("First session should have WPM 30.0, got %.1f", sessions[0].WPM)
+	}
+}
+
+func TestGetAverageWPM(t *testing.T) {
+	tmpDB := "/tmp/kata_test_avg_wpm.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create DB: %v", err)
+	}
+	defer db.Close()
+
+	avgBefore, _ := db.GetAverageWPM()
+	if avgBefore != 0 {
+		t.Errorf("Expected 0 WPM before any sessions, got %.1f", avgBefore)
+	}
+
+	wpmValues := []float64{40.0, 50.0, 60.0}
+	expectedAvg := 50.0
+
+	now := time.Now()
+	for i, wpm := range wpmValues {
+		session := Session{
+			Text:       "test",
+			WPM:        wpm,
+			Accuracy:   90.0,
+			Duration:   60.0,
+			ErrorCount: 0,
+			Timestamp:  now.Add(time.Duration(i) * time.Minute),
+		}
+		if err := db.SaveSession(session); err != nil {
+			t.Fatalf("SaveSession failed: %v", err)
+		}
+	}
+
+	avg, err := db.GetAverageWPM()
+	if err != nil {
+		t.Fatalf("GetAverageWPM failed: %v", err)
+	}
+
+	if avg != expectedAvg {
+		t.Errorf("Expected average WPM %.1f, got %.1f", expectedAvg, avg)
+	}
+}
+
+func TestGetWeakestKeys(t *testing.T) {
+	tmpDB := "/tmp/kata_test_weakest.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create DB: %v", err)
+	}
+	defer db.Close()
+
+	testData := []struct {
+		key       string
+		errors    int
+		successes int
+	}{
+		{"a", 5, 5},
+		{"b", 1, 9},
+		{"c", 8, 2},
+		{"d", 0, 10},
+		{"e", 6, 2},
+	}
+
+	now := time.Now()
+	for _, td := range testData {
+		_, err = db.conn.Exec(`
+			INSERT INTO key_stats (key, errors, successes, last_practiced, interval, repetitions, ease_factor)
+			VALUES (?, ?, ?, ?, 0, 0, 2.5)
+		`, td.key, td.errors, td.successes, now)
+		if err != nil {
+			t.Fatalf("Insert failed for key '%s': %v", td.key, err)
+		}
+	}
+
+	weakKeys, err := db.GetWeakestKeys(3)
+	if err != nil {
+		t.Fatalf("GetWeakestKeys failed: %v", err)
+	}
+
+	if len(weakKeys) != 3 {
+		t.Fatalf("Expected 3 keys, got %d", len(weakKeys))
+	}
+
+	if weakKeys[0].Key != "c" {
+		t.Errorf("Expected 'c' as weakest (80%% error rate), got '%s'", weakKeys[0].Key)
+	}
+
+	if weakKeys[1].Key != "e" {
+		t.Errorf("Expected 'e' as second weakest (75%% error rate), got '%s'", weakKeys[1].Key)
+	}
+
+	if weakKeys[2].Key != "a" {
+		t.Errorf("Expected 'a' as third weakest (50%% error rate), got '%s'", weakKeys[2].Key)
+	}
+}
+
+func TestGetAllKeyStats(t *testing.T) {
+	tmpDB := "/tmp/kata_test_all_stats.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create DB: %v", err)
+	}
+	defer db.Close()
+
+	allBefore, _ := db.GetAllKeyStats()
+	if len(allBefore) != 0 {
+		t.Errorf("Expected 0 stats initially, got %d", len(allBefore))
+	}
+
+	err = db.UpdateKeyStats("abc", "abc")
+	if err != nil {
+		t.Fatalf("UpdateKeyStats failed: %v", err)
+	}
+
+	allAfter, err := db.GetAllKeyStats()
+	if err != nil {
+		t.Fatalf("GetAllKeyStats failed: %v", err)
+	}
+
+	if len(allAfter) != 3 {
+		t.Fatalf("Expected 3 key stats, got %d", len(allAfter))
+	}
+
+	keys := make(map[string]bool)
+	for _, stat := range allAfter {
+		keys[stat.Key] = true
+		if stat.Errors != 0 {
+			t.Errorf("Key '%s': expected 0 errors, got %d", stat.Key, stat.Errors)
+		}
+		if stat.Successes != 1 {
+			t.Errorf("Key '%s': expected 1 success, got %d", stat.Key, stat.Successes)
+		}
+	}
+
+	if !keys["a"] || !keys["b"] || !keys["c"] {
+		t.Error("Expected to find keys 'a', 'b', 'c'")
+	}
+}
+
+func TestAnalyzeErrors(t *testing.T) {
+	cases := []struct {
+		name            string
+		target          string
+		input           string
+		expectedErrors  map[string]int
+		expectedBigrams map[string]int
+	}{
+		{
+			name:            "perfect match",
+			target:          "hello",
+			input:           "hello",
+			expectedErrors:  map[string]int{},
+			expectedBigrams: map[string]int{},
+		},
+		{
+			name:            "single error",
+			target:          "hello",
+			input:           "hallo",
+			expectedErrors:  map[string]int{"e": 1},
+			expectedBigrams: map[string]int{"he": 1},
+		},
+		{
+			name:            "multiple errors",
+			target:          "test",
+			input:           "txst",
+			expectedErrors:  map[string]int{"e": 1},
+			expectedBigrams: map[string]int{"te": 1},
+		},
+		{
+			name:            "input shorter than target",
+			target:          "hello",
+			input:           "hel",
+			expectedErrors:  map[string]int{},
+			expectedBigrams: map[string]int{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			analysis := AnalyzeErrors(tc.target, tc.input)
+
+			if len(analysis.CharErrors) != len(tc.expectedErrors) {
+				t.Errorf("Expected %d char errors, got %d", len(tc.expectedErrors), len(analysis.CharErrors))
+			}
+
+			for char, count := range tc.expectedErrors {
+				if analysis.CharErrors[char] != count {
+					t.Errorf("Expected %d errors for '%s', got %d", count, char, analysis.CharErrors[char])
+				}
+			}
+
+			for bigram, count := range tc.expectedBigrams {
+				if analysis.BigramErrors[bigram] != count {
+					t.Errorf("Expected %d errors for bigram '%s', got %d", count, bigram, analysis.BigramErrors[bigram])
+				}
+			}
+		})
+	}
+}
+
+func TestAccuracyToQuality(t *testing.T) {
+	cases := []struct {
+		accuracy        float64
+		expectedQuality int
+	}{
+		{1.0, 5},
+		{0.95, 5},
+		{0.94, 4},
+		{0.85, 4},
+		{0.84, 3},
+		{0.70, 3},
+		{0.69, 2},
+		{0.50, 2},
+		{0.49, 1},
+		{0.30, 1},
+		{0.29, 0},
+		{0.0, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("accuracy_%.2f", tc.accuracy), func(t *testing.T) {
+			quality := accuracyToQuality(tc.accuracy)
+			if quality != tc.expectedQuality {
+				t.Errorf("Accuracy %.2f: expected quality %d, got %d",
+					tc.accuracy, tc.expectedQuality, quality)
+			}
+		})
+	}
+}
+
+func TestMigrateSchema(t *testing.T) {
+	tmpDB := "/tmp/kata_test_migration.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	conn, err := sql.Open("sqlite", tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to open DB: %v", err)
+	}
+	defer conn.Close()
+
+	_, err = conn.Exec(`
+		CREATE TABLE key_stats (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			key TEXT NOT NULL,
+			errors INTEGER DEFAULT 0,
+			successes INTEGER DEFAULT 0,
+			last_practiced DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(key)
+		)
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create old schema: %v", err)
+	}
+
+	var count int
+	err = conn.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('key_stats') WHERE name='interval'`).Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to check columns: %v", err)
+	}
+	if count != 0 {
+		t.Fatal("Old schema should not have 'interval' column")
+	}
+
+	conn.Close()
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("NewDB failed: %v", err)
+	}
+	defer db.Close()
+
+	err = db.conn.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('key_stats') WHERE name='interval'`).Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to check migrated columns: %v", err)
+	}
+	if count != 1 {
+		t.Error("Migration should have added 'interval' column")
+	}
+
+	err = db.conn.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('key_stats') WHERE name='repetitions'`).Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to check repetitions column: %v", err)
+	}
+	if count != 1 {
+		t.Error("Migration should have added 'repetitions' column")
+	}
+
+	err = db.conn.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('key_stats') WHERE name='ease_factor'`).Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to check ease_factor column: %v", err)
+	}
+	if count != 1 {
+		t.Error("Migration should have added 'ease_factor' column")
 	}
 }
