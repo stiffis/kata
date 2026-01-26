@@ -43,7 +43,7 @@ func (m model) renderPractice() string {
 					if userInput[i] == targetText[i] {
 						textBlock.WriteString(m.theme.Correct.Render(string(targetText[i])))
 					} else {
-						textBlock.WriteString(m.theme.Incorrect.Render(string(targetText[i])))
+						textBlock.WriteString(m.theme.Incorrect.Render(string(userInput[i])))
 					}
 				} else if i == len(userInput) {
 					textBlock.WriteString(m.theme.Cursor.Render(string(targetText[i])))
@@ -124,7 +124,7 @@ func (m model) renderPracticeZen() string {
 			if userInput[i] == targetText[i] {
 				b.WriteString(m.theme.Correct.Render(string(targetText[i])))
 			} else {
-				b.WriteString(m.theme.Incorrect.Render(string(targetText[i])))
+				b.WriteString(m.theme.Incorrect.Render(string(userInput[i])))
 			}
 		} else if i == len(userInput) {
 			b.WriteString(m.theme.Cursor.Render(string(targetText[i])))
