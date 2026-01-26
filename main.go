@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/guptarohit/asciigraph"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/guptarohit/asciigraph"
 	"golang.org/x/term"
 
 	"kata/pkg/config"
@@ -24,7 +24,7 @@ import (
 var (
 	// Deprecated: These will be replaced by theme system
 	// Kept for backward compatibility if any legacy code remains
-	menuStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
+	menuStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
 )
 
 type screen int
@@ -42,53 +42,53 @@ type model struct {
 	screen      screen
 	menuIndex   int
 	menuOptions []string
-	
+
 	// Engine handles the typing state
-	engine      *engine.Engine
-	targetText  string // Temporary holder for text before engine start
-	
+	engine     *engine.Engine
+	targetText string // Temporary holder for text before engine start
+
 	// File loading
-	textInput   textinput.Model
-	errMsg      string
-	
+	textInput textinput.Model
+	errMsg    string
+
 	// Window dimensions
-	width       int
-	height      int
-	
-	generator   *generator.Generator
-	db          *stats.DB
-	theme       themes.Theme
-	themeIndex  int
-	config      config.Config
+	width  int
+	height int
+
+	generator  *generator.Generator
+	db         *stats.DB
+	theme      themes.Theme
+	themeIndex int
+	config     config.Config
 }
 
 func initialModel() model {
 	gen := generator.New()
-	
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Printf("Warning: Could not load config: %v\n", err)
 		cfg = config.DefaultConfig()
 	}
-	
-db, err := stats.NewDB(cfg.DBPath)
+
+	db, err := stats.NewDB(cfg.DBPath)
 	if err != nil {
 		// Log but don't crash, stats will just be disabled
 		// fmt.Printf("Warning: Could not open database at %s: %v\n", cfg.DBPath, err)
 	}
-	
+
 	// Load theme from config
 	selectedTheme := themes.GetTheme(cfg.Theme)
-	
+
 	// Set generator language
 	gen.SetLanguage(generator.Language(cfg.Language))
-	
+
 	ti := textinput.New()
 	ti.Placeholder = "/path/to/file.txt"
 	ti.CharLimit = 156
 	ti.Width = 40
-	
+
 	return model{
 		screen:      screenMenu,
 		menuIndex:   0,
@@ -184,7 +184,7 @@ func (m model) selectMenuItem() (tea.Model, tea.Cmd) {
 	case 8: // Change Language
 		m.screen = screenLanguageSelect
 		// Reuse themeIndex for language list navigation as it's just an int
-		m.themeIndex = 0 
+		m.themeIndex = 0
 		return m, nil
 	case 9: // Toggle Zen Mode
 		m.config.ZenMode = !m.config.ZenMode
@@ -299,7 +299,7 @@ func (m *model) saveSession() {
 	}
 
 	m.db.SaveSession(session)
-	
+
 	// Update key statistics for SRS
 	m.db.UpdateKeyStats(string(m.engine.TargetText), string(m.engine.UserInput))
 }
@@ -307,7 +307,7 @@ func (m *model) saveSession() {
 func (m model) handleThemeSelectInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	themeNames := themes.ListThemes()
 	maxIndex := len(themeNames) - 1
-	
+
 	switch msg.String() {
 	case "ctrl+c", "q":
 		if m.db != nil {
@@ -334,7 +334,7 @@ func (m model) handleThemeSelectInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.themeIndex >= 0 && m.themeIndex < len(themeNames) {
 			themeName := themeNames[m.themeIndex]
 			m.theme = themes.GetTheme(themeName)
-			
+
 			// Save theme to config
 			m.config.Theme = themeName
 			if err := config.Save(m.config); err != nil {
@@ -351,7 +351,7 @@ func (m model) handleThemeSelectInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m model) handleLanguageSelectInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	languages := []string{"go", "cpp", "javascript", "rust", "python", "english", "spanish", "french", "german"}
 	maxIndex := len(languages) - 1
-	
+
 	switch msg.String() {
 	case "ctrl+c", "q":
 		if m.db != nil {
@@ -377,10 +377,10 @@ func (m model) handleLanguageSelectInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Apply selected language
 		if m.themeIndex >= 0 && m.themeIndex < len(languages) {
 			lang := languages[m.themeIndex]
-			
+
 			// Update generator
 			m.generator.SetLanguage(generator.Language(lang))
-			
+
 			// Save to config
 			m.config.Language = lang
 			if err := config.Save(m.config); err != nil {
@@ -410,13 +410,13 @@ func (m model) renderLanguageSelect() string {
 			cursor = "▶ "
 			style = m.theme.Selected
 		}
-		
+
 		// Add active indicator
 		active := ""
 		if lang == m.config.Language {
 			active = " " + m.theme.Correct.Render("(current)")
 		}
-		
+
 		b.WriteString(style.Render(fmt.Sprintf("%s%-10s%s", cursor, strings.Title(lang), active)))
 		b.WriteString("\n")
 	}
@@ -439,17 +439,17 @@ func (m model) handleLoadFileInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.errMsg = fmt.Sprintf("Error: %v", err)
 			return m, nil
 		}
-		
+
 		if strings.TrimSpace(content) == "" {
 			m.errMsg = "Error: File is empty"
 			return m, nil
 		}
-		
+
 		m.targetText = strings.TrimSpace(content)
 		m.startPractice()
 		return m, nil
 	}
-	
+
 	var cmd tea.Cmd
 	m.textInput, cmd = m.textInput.Update(msg)
 	return m, cmd
@@ -462,10 +462,10 @@ func (m model) renderLoadFile() string {
 	b.WriteString("\n\n")
 	b.WriteString(m.theme.Dim.Render("Enter the path to a text file:"))
 	b.WriteString("\n\n")
-	
+
 	b.WriteString(m.textInput.View())
 	b.WriteString("\n\n")
-	
+
 	if m.errMsg != "" {
 		b.WriteString(m.theme.Incorrect.Render(m.errMsg))
 		b.WriteString("\n\n")
@@ -523,9 +523,9 @@ func (m model) renderMenu() string {
 			cursor = "▶ "
 			style = m.theme.Selected
 		}
-		
+
 		// Add indicator for Toggle Zen Mode
-	displayOption := option
+		displayOption := option
 		if option == "Toggle Zen Mode" {
 			if m.config.ZenMode {
 				displayOption = "Toggle Zen Mode [ON]"
@@ -533,7 +533,7 @@ func (m model) renderMenu() string {
 				displayOption = "Toggle Zen Mode [OFF]"
 			}
 		}
-		
+
 		b.WriteString(style.Render(cursor + displayOption))
 		b.WriteString("\n")
 	}
@@ -555,7 +555,7 @@ func (m model) renderThemeSelect() string {
 	b.WriteString("\n\n")
 
 	themeNames := themes.ListThemes()
-	
+
 	// Show preview of selected theme
 	if m.themeIndex < len(themeNames) {
 		selectedTheme := themes.GetTheme(themeNames[m.themeIndex])
@@ -565,9 +565,9 @@ func (m model) renderThemeSelect() string {
 		b.WriteString("  ")
 		b.WriteString(selectedTheme.Dim.Render("\"Practice makes perfect\""))
 		b.WriteString("\n")
-		
+
 		// Simulate typing practice
-	sampleText := "func main() {"
+		sampleText := "func main() {"
 		userText := "func mai"
 		for i, ch := range sampleText {
 			if i < len(userText) {
@@ -599,9 +599,9 @@ func (m model) renderThemeSelect() string {
 			cursor = "▶ "
 			style = m.theme.Selected
 		}
-		
+
 		b.WriteString(style.Render(fmt.Sprintf("%s%-12s", cursor, themeName)))
-		
+
 		// Mini color indicators
 		preview := themes.GetTheme(themeName)
 		b.WriteString("  ")
@@ -651,17 +651,17 @@ func (m model) renderStats() string {
 	// WPM Over Time Graph
 	b.WriteString(m.theme.Stats.Render("📈 WPM Progress Over Time:"))
 	b.WriteString("\n")
-	
+
 	wpmData := make([]float64, len(sessions))
 	for i, s := range sessions {
 		wpmData[i] = s.WPM
 	}
-	
-	graph := asciigraph.Plot(wpmData, 
+
+	graph := asciigraph.Plot(wpmData,
 		asciigraph.Height(8),
 		asciigraph.Width(60),
 		asciigraph.Caption(fmt.Sprintf("Last %d sessions", len(sessions))))
-	
+
 	b.WriteString(m.theme.Correct.Render(graph))
 	b.WriteString("\n")
 	b.WriteString(separator)
@@ -679,17 +679,17 @@ func (m model) renderStats() string {
 	// Accuracy sparkline
 	b.WriteString(m.theme.Stats.Render("🎯 Accuracy Trend:"))
 	b.WriteString("\n")
-	
+
 	accData := make([]float64, len(sessions))
 	for i, s := range sessions {
 		accData[i] = s.Accuracy
 	}
-	
+
 	accGraph := asciigraph.Plot(accData,
 		asciigraph.Height(6),
 		asciigraph.Width(60),
 		asciigraph.Caption("Accuracy %"))
-	
+
 	b.WriteString(menuStyle.Render(accGraph))
 	b.WriteString("\n")
 	b.WriteString(separator)
@@ -700,14 +700,14 @@ func (m model) renderStats() string {
 	if err == nil && len(weakKeys) > 0 {
 		b.WriteString(m.theme.Incorrect.Render("🔥 Your Weakest Keys:"))
 		b.WriteString("\n")
-		
+
 		maxErrors := 1 // Prevent division by zero
 		for _, k := range weakKeys {
 			if k.Errors > maxErrors {
 				maxErrors = k.Errors
 			}
 		}
-		
+
 		for i, k := range weakKeys {
 			if i >= 5 {
 				break
@@ -716,9 +716,9 @@ func (m model) renderStats() string {
 			if total == 0 {
 				continue // Skip if no data
 			}
-			
+
 			errorRate := float64(k.Errors) / float64(total) * 100.0
-			
+
 			keyDisplay := k.Key
 			if k.Key == "\n" {
 				keyDisplay = "↵"
@@ -727,7 +727,7 @@ func (m model) renderStats() string {
 			} else if k.Key == " " {
 				keyDisplay = "␣"
 			}
-			
+
 			// Create horizontal bar (ensure it's never negative)
 			barLength := int(float64(k.Errors) / float64(maxErrors) * 30)
 			if barLength < 0 {
@@ -737,9 +737,9 @@ func (m model) renderStats() string {
 				barLength = 1
 			}
 			bar := strings.Repeat("█", barLength)
-			
-			b.WriteString(fmt.Sprintf("  '%s' %s %.0f%% (%d errors)\n", 
-				keyDisplay, 
+
+			b.WriteString(fmt.Sprintf("  '%s' %s %.0f%% (%d errors)\n",
+				keyDisplay,
 				m.theme.Incorrect.Render(bar),
 				errorRate,
 				k.Errors))
@@ -767,7 +767,7 @@ func (m model) renderStats() string {
 					wpmIndicator = m.theme.Incorrect.Render("↓")
 				}
 			}
-			b.WriteString(fmt.Sprintf("  %s %s WPM: %.0f | Acc: %.1f%%\n", 
+			b.WriteString(fmt.Sprintf("  %s %s WPM: %.0f | Acc: %.1f%%\n",
 				m.theme.Dim.Render(timeStr), wpmIndicator, s.WPM, s.Accuracy))
 		}
 	}
@@ -792,7 +792,7 @@ func (m model) renderStats() string {
 
 func (m model) renderPractice() string {
 	var content string
-	
+
 	// Use Zen mode if enabled
 	if m.config.ZenMode {
 		content = m.renderPracticeZen()
@@ -811,16 +811,16 @@ func (m model) renderPractice() string {
 			b.WriteString(m.theme.Stats.Render(fmt.Sprintf("Accuracy: %.1f%%\n", accuracy)))
 			b.WriteString("\n")
 			b.WriteString(m.theme.Dim.Render("Press Enter to return to menu | q to quit"))
-			
+
 			content = b.String()
 		} else {
 			// Render the text with colors
 			// Wrap text in a container to prevent it from spreading too wide
 			var textBlock strings.Builder
-			
+
 			targetText := m.engine.TargetText
 			userInput := m.engine.UserInput
-			
+
 			for i := 0; i < len(targetText); i++ {
 				if i < len(userInput) {
 					if userInput[i] == targetText[i] {
@@ -834,12 +834,12 @@ func (m model) renderPractice() string {
 					textBlock.WriteString(m.theme.Dim.Render(string(targetText[i])))
 				}
 			}
-			
+
 			// Show cursor if user typed past the end
 			if len(userInput) >= len(targetText) {
 				textBlock.WriteString(m.theme.Cursor.Render(" "))
 			}
-			
+
 			// Apply a width limit to the text block for better reading
 			// Default width 60, but adapt if screen is smaller
 			textWidth := 60
@@ -849,12 +849,12 @@ func (m model) renderPractice() string {
 			if textWidth < 20 {
 				textWidth = 20
 			}
-			
+
 			style := lipgloss.NewStyle().Width(textWidth).Align(lipgloss.Left)
 			b.WriteString(style.Render(textBlock.String()))
 
 			b.WriteString("\n\n")
-			
+
 			if !m.engine.StartTime.IsZero() {
 				wpm, _, duration := m.engine.GetStats()
 				progress := float64(len(userInput)) / float64(len(targetText)) * 100.0
@@ -868,11 +868,11 @@ func (m model) renderPractice() string {
 
 			b.WriteString("\n\n")
 			b.WriteString(m.theme.Dim.Render("ESC to menu | Ctrl+Z to toggle zen | Ctrl+C to quit"))
-			
+
 			content = b.String()
 		}
 	}
-	
+
 	if m.width > 0 && m.height > 0 {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 	}
@@ -897,7 +897,7 @@ func (m model) renderPracticeZen() string {
 
 	// Only show the text, no header, no stats
 	b.WriteString("\n\n")
-	
+
 	// Render text
 	targetText := m.engine.TargetText
 	userInput := m.engine.UserInput
@@ -915,7 +915,7 @@ func (m model) renderPracticeZen() string {
 			b.WriteString(m.theme.Dim.Render(string(targetText[i])))
 		}
 	}
-	
+
 	if len(userInput) >= len(targetText) {
 		b.WriteString(m.theme.Cursor.Render(" "))
 	}
@@ -937,7 +937,7 @@ func main() {
 		exportFormat = ""
 		exportOutput = ""
 	)
-	
+
 	// Simple flag parsing
 	for i := 1; i < len(os.Args); i++ {
 		arg := os.Args[i]
@@ -974,19 +974,19 @@ func main() {
 			showHelp = true
 		}
 	}
-	
+
 	// Handle --help
 	if showHelp {
 		printHelp()
 		return
 	}
-	
+
 	// Load config
 	cfg, err := config.Load()
 	if err != nil {
 		cfg = config.DefaultConfig()
 	}
-	
+
 	// Handle --theme
 	if setTheme != "" {
 		cfg.Theme = setTheme
@@ -997,7 +997,7 @@ func main() {
 		fmt.Printf("Theme set to: %s\n", setTheme)
 		return
 	}
-	
+
 	// Handle --zen
 	if enableZen {
 		cfg.ZenMode = true
@@ -1005,31 +1005,31 @@ func main() {
 			fmt.Printf("Error saving zen mode: %v\n", err)
 		}
 	}
-	
+
 	// Handle export
 	if exportFormat != "" {
 		handleExport(exportFormat, exportOutput)
 		return
 	}
-	
+
 	// Handle --stats
 	if showStats {
 		printStats()
 		return
 	}
-	
+
 	// Handle practice mode
 	if practiceMode != "" {
 		runPracticeMode(practiceMode)
 		return
 	}
-	
+
 	// Handle practice from file
 	if practiceFile != "" {
 		runPracticeFromFile(practiceFile)
 		return
 	}
-	
+
 	// Normal interactive mode
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
@@ -1084,15 +1084,16 @@ func printStats() {
 		os.Exit(1)
 	}
 	defer db.Close()
-	
-	fmt.Println("📊 KATA Statistics\n")
-	
+
+	fmt.Println("📊 KATA Statistics")
+	fmt.Println()
+
 	// Average WPM
 	avgWPM, err := db.GetAverageWPM()
 	if err == nil && avgWPM > 0 {
 		fmt.Printf("Average WPM: %.0f\n\n", avgWPM)
 	}
-	
+
 	// Recent sessions
 	sessions, err := db.GetRecentSessions(5)
 	if err == nil && len(sessions) > 0 {
@@ -1103,7 +1104,7 @@ func printStats() {
 		}
 		fmt.Println()
 	}
-	
+
 	// Weakest keys
 	weakKeys, err := db.GetWeakestKeys(5)
 	if err == nil && len(weakKeys) > 0 {
@@ -1127,10 +1128,10 @@ func printStats() {
 func runPracticeMode(mode string) {
 	gen := generator.New()
 	var targetText string
-	
+
 	// Load config for DB path in case we need weaknesses
 	cfg, _ := config.Load()
-	
+
 	switch mode {
 	case "bigrams", "b":
 		targetText = strings.TrimSpace(gen.GenerateLesson(generator.TypeBigrams, 20))
@@ -1147,7 +1148,7 @@ func runPracticeMode(mode string) {
 			os.Exit(1)
 		}
 		defer db.Close()
-		
+
 		weakKeys, err := db.GetWeakestKeys(10)
 		if err != nil || len(weakKeys) == 0 {
 			targetText = strings.TrimSpace(gen.GenerateLesson(generator.TypeWords, 15))
@@ -1171,12 +1172,12 @@ func runPracticeMode(mode string) {
 		fmt.Println("Available modes: bigrams, keywords, symbols, code, weaknesses")
 		os.Exit(1)
 	}
-	
+
 	// Create model with target text and start practice
 	m := initialModel()
 	m.targetText = targetText
 	m.startPractice()
-	
+
 	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)

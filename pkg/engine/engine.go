@@ -92,6 +92,29 @@ func (e *Engine) calculateErrors() {
 	}
 }
 
+func (e *Engine) updateErrorsIncremental(oldLength int) {
+	newLength := len(e.UserInput)
+
+	if newLength < oldLength {
+		e.calculateErrors()
+		return
+	}
+
+	if newLength == oldLength {
+		return
+	}
+
+	for i := oldLength; i < newLength; i++ {
+		if i < len(e.TargetText) {
+			if e.UserInput[i] != e.TargetText[i] {
+				e.ErrorCount++
+			}
+		} else {
+			e.ErrorCount++
+		}
+	}
+}
+
 func (e *Engine) deleteLastWord(input []rune) []rune {
 	if len(input) == 0 {
 		return input
