@@ -1,4 +1,4 @@
-package main
+package app
 
 func (m model) View() string {
 	switch m.screen {

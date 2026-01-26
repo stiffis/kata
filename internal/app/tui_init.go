@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 
 	"kata/pkg/config"
 	"kata/pkg/engine"
@@ -13,6 +14,19 @@ import (
 	"kata/pkg/stats"
 	"kata/pkg/themes"
 )
+
+// New creates a new TUI application model starting at the main menu
+func New() tea.Model {
+	return initialModel()
+}
+
+// NewPractice creates a new TUI application model starting directly in practice mode
+func NewPractice(targetText string) tea.Model {
+	m := initialModel()
+	m.targetText = strings.TrimSpace(targetText)
+	m.startPractice()
+	return m
+}
 
 func initialModel() model {
 	gen := generator.New()
