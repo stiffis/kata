@@ -68,7 +68,7 @@ func TestDeleteLastWord(t *testing.T) {
 }
 
 func TestStatsCalculation(t *testing.T) {
-	target := "abcde" // 5 chars = 1 standard word
+	target := "abcde"
 	e := New(target)
 
 	e.StartTime = time.Now().Add(-60 * time.Second)
@@ -86,3 +86,24 @@ func TestStatsCalculation(t *testing.T) {
 	}
 }
 
+func TestWPMWithErrors(t *testing.T) {
+	target := "hello"
+	e := New(target)
+
+	for _, char := range "hella" {
+		e.ProcessKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}})
+	}
+
+	e.StartTime = time.Now().Add(-60 * time.Second)
+	e.EndTime = time.Now()
+
+	wpm, _, _ := e.GetStats()
+
+	expectedCorrect := 5 - 1
+	expectedWords := float64(expectedCorrect) / 5.0
+	expectedWPM := expectedWords * 1.0
+
+	if wpm < expectedWPM-0.1 || wpm > expectedWPM+0.1 {
+		t.Errorf("Expected ~%.2f WPM (4 correct chars / 5), got %.2f", expectedWPM, wpm)
+	}
+}
