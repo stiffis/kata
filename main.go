@@ -203,25 +203,26 @@ func (m model) selectMenuItem() (tea.Model, tea.Cmd) {
 
 func (m *model) generateWeaknessLesson() {
 	if m.db == nil {
-		// Fallback to keywords
 		m.targetText = m.generator.GenerateLesson(generator.TypeWords, 15)
 		m.targetText = strings.TrimSpace(m.targetText)
 		m.startPractice()
 		return
 	}
 
-	weakKeys, err := m.db.GetWeakestKeys(10)
-	if err != nil || len(weakKeys) == 0 {
-		// Fallback to keywords if no data yet
-		m.targetText = m.generator.GenerateLesson(generator.TypeWords, 15)
-		m.targetText = strings.TrimSpace(m.targetText)
-		m.startPractice()
-		return
+	dueKeys, err := m.db.GetDueKeys(10)
+	if err != nil || len(dueKeys) == 0 {
+		weakKeys, err := m.db.GetWeakestKeys(10)
+		if err != nil || len(weakKeys) == 0 {
+			m.targetText = m.generator.GenerateLesson(generator.TypeWords, 15)
+			m.targetText = strings.TrimSpace(m.targetText)
+			m.startPractice()
+			return
+		}
+		dueKeys = weakKeys
 	}
 
-	// Convert to generator format
 	var weakList []generator.WeakKey
-	for _, k := range weakKeys {
+	for _, k := range dueKeys {
 		total := float64(k.Errors + k.Successes)
 		if total == 0 {
 			continue
@@ -1149,12 +1150,19 @@ func runPracticeMode(mode string) {
 		}
 		defer db.Close()
 
-		weakKeys, err := db.GetWeakestKeys(10)
-		if err != nil || len(weakKeys) == 0 {
-			targetText = strings.TrimSpace(gen.GenerateLesson(generator.TypeWords, 15))
-		} else {
+		dueKeys, err := db.GetDueKeys(10)
+		if err != nil || len(dueKeys) == 0 {
+			weakKeys, err := db.GetWeakestKeys(10)
+			if err != nil || len(weakKeys) == 0 {
+				targetText = strings.TrimSpace(gen.GenerateLesson(generator.TypeWords, 15))
+			} else {
+				dueKeys = weakKeys
+			}
+		}
+
+		if len(dueKeys) > 0 {
 			var weakList []generator.WeakKey
-			for _, k := range weakKeys {
+			for _, k := range dueKeys {
 				total := float64(k.Errors + k.Successes)
 				if total == 0 {
 					continue
