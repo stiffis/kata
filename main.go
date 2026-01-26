@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"kata/internal/app"
 	"kata/pkg/config"
 )
 
@@ -115,7 +116,7 @@ func main() {
 	}
 
 	// Normal interactive mode
-	p := tea.NewProgram(initialModel())
+	p := tea.NewProgram(app.New())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)
