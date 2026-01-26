@@ -748,3 +748,120 @@ func TestMigrateSchema(t *testing.T) {
 		t.Error("Migration should have added 'ease_factor' column")
 	}
 }
+
+func TestIndexesCreated(t *testing.T) {
+	tmpDB := "/tmp/kata_test_indexes.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("NewDB failed: %v", err)
+	}
+	defer db.Close()
+
+	rows, err := db.conn.Query(`SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL`)
+	if err != nil {
+		t.Fatalf("Failed to query indexes: %v", err)
+	}
+	defer rows.Close()
+
+	indexes := make(map[string]bool)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatalf("Failed to scan index name: %v", err)
+		}
+		indexes[name] = true
+	}
+
+	expectedIndexes := []string{
+		"idx_sessions_timestamp",
+		"idx_key_stats_last_practiced",
+		"idx_key_stats_attempts",
+	}
+
+	for _, idx := range expectedIndexes {
+		if !indexes[idx] {
+			t.Errorf("Expected index '%s' not found", idx)
+		}
+	}
+
+	if len(indexes) < len(expectedIndexes) {
+		t.Logf("Found indexes: %v", indexes)
+	}
+}
+
+func TestIndexPerformance(t *testing.T) {
+	tmpDB := "/tmp/kata_test_perf.db"
+	os.Remove(tmpDB)
+	defer os.Remove(tmpDB)
+
+	db, err := NewDB(tmpDB)
+	if err != nil {
+		t.Fatalf("NewDB failed: %v", err)
+	}
+	defer db.Close()
+
+	now := time.Now()
+	for i := 0; i < 1000; i++ {
+		session := Session{
+			Text:       "test",
+			WPM:        float64(30 + i%50),
+			Accuracy:   85.0,
+			Duration:   60.0,
+			ErrorCount: i % 10,
+			Timestamp:  now.Add(time.Duration(i) * time.Second),
+		}
+		if err := db.SaveSession(session); err != nil {
+			t.Fatalf("SaveSession failed: %v", err)
+		}
+	}
+
+	for i := 0; i < 100; i++ {
+		key := string(rune('a' + (i % 26)))
+		_, err := db.conn.Exec(`
+			INSERT OR REPLACE INTO key_stats (key, errors, successes, last_practiced, interval, repetitions, ease_factor)
+			VALUES (?, ?, ?, ?, ?, ?, 2.5)
+		`, key, i%10, 10-i%10, now.Add(time.Duration(-i)*24*time.Hour), i%7, i%3)
+		if err != nil {
+			t.Fatalf("Insert key_stats failed: %v", err)
+		}
+	}
+
+	start := time.Now()
+	_, err = db.GetRecentSessions(20)
+	if err != nil {
+		t.Fatalf("GetRecentSessions failed: %v", err)
+	}
+	durationRecent := time.Since(start)
+
+	start = time.Now()
+	_, err = db.GetDueKeys(50)
+	if err != nil {
+		t.Fatalf("GetDueKeys failed: %v", err)
+	}
+	durationDue := time.Since(start)
+
+	start = time.Now()
+	_, err = db.GetSessionsForGraph(50)
+	if err != nil {
+		t.Fatalf("GetSessionsForGraph failed: %v", err)
+	}
+	durationGraph := time.Since(start)
+
+	if durationRecent > 50*time.Millisecond {
+		t.Errorf("GetRecentSessions took %v (expected < 50ms with index)", durationRecent)
+	}
+
+	if durationDue > 50*time.Millisecond {
+		t.Errorf("GetDueKeys took %v (expected < 50ms with index)", durationDue)
+	}
+
+	if durationGraph > 50*time.Millisecond {
+		t.Errorf("GetSessionsForGraph took %v (expected < 50ms with index)", durationGraph)
+	}
+
+	t.Logf("Performance: GetRecentSessions=%v, GetDueKeys=%v, GetSessionsForGraph=%v",
+		durationRecent, durationDue, durationGraph)
+}
