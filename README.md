@@ -17,23 +17,23 @@
 
 ---
 
-## 🥢 What is KATA?
+## What is KATA?
 
 **KATA** is a terminal-based typing trainer inspired by martial arts philosophy. It's not just about typing fast; it's about internalizing movements until code flows from your fingers without conscious thought.
 
 Based on the **Monkeytype** aesthetic and powered by **Go**, KATA is designed for developers who want to master their craft.
 
-## ✨ Features
+## Features
 
-- 🌍 **Multi-language:** Support for English, Spanish, French, and German.
-- 💻 **Developer Mode:** Practice with real syntax from **Go, Rust, Python, C++, and JavaScript**.
-- 📊 **Smart Analysis:** Track WPM, accuracy, and detect your "weak keys."
-- 🗺️ **Keyboard Heatmap:** Visualize which keys are giving you the most trouble.
-- 🎨 **Beautiful Themes:** Catppuccin, Nord, Dracula, Rose Pine, and more.
-- 📂 **File Loading:** Practice with your own text or code files.
-- 🥋 **Zen Mode:** Remove distractions and focus entirely on the text.
+- **Multi-language:** Support for English, Spanish, French, and German.
+- **Developer Mode:** Practice with real syntax from **Go, Rust, Python, C++, and JavaScript**.
+- **Smart Analysis:** Track WPM, accuracy, and detect your "weak keys."
+- **Keyboard Heatmap:** Visualize which keys are giving you the most trouble.
+- **Beautiful Themes:** Catppuccin, Nord, Dracula, Rose Pine, and more.
+- **File Loading:** Practice with your own text or code files.
+- **Zen Mode:** Remove distractions and focus entirely on the text.
 
-## 📸 Screenshots
+## Screenshots
 
 <p align="center">
   <img src="assets/p1.png" width="800" alt="Practice Mode">
@@ -47,7 +47,7 @@ Based on the **Monkeytype** aesthetic and powered by **Go**, KATA is designed fo
   <em>Detailed statistics and keyboard heatmap.</em>
 </p>
 
-## 🚀 Quick Installation
+## Quick Installation
 
 Ensure you have Go installed and run:
 
@@ -60,14 +60,14 @@ chmod +x install.sh
 
 Now, simply type `kata` in your terminal.
 
-## 🛠️ Usage
+## Usage
 
 - `kata`: Opens the interactive menu.
 - `kata --file <path>`: Practice with a specific file.
 - `kata --stats`: View your accumulated progress.
 - `kata --theme dracula`: Change the theme quickly.
 
-## 📜 License
+## License
 
 This project is licensed under the **GPL-3.0 License**. See the [LICENSE](LICENSE) file for more details.
 
