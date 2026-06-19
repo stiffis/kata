@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -27,7 +28,7 @@ func (m model) renderPractice() string {
 			b.WriteString(m.theme.Stats.Render(fmt.Sprintf("WPM: %.0f\n", wpm)))
 			b.WriteString(m.theme.Stats.Render(fmt.Sprintf("Accuracy: %.1f%%\n", accuracy)))
 			b.WriteString("\n")
-			b.WriteString(m.theme.Dim.Render("Press Enter to return to menu | q to quit"))
+			b.WriteString(m.theme.Dim.Render("Enter: menu | r: retry | n: next | q: quit"))
 
 			content = b.String()
 		} else {
@@ -74,11 +75,21 @@ func (m model) renderPractice() string {
 
 			if !m.engine.StartTime.IsZero() {
 				wpm, _, duration := m.engine.GetStats()
-				progress := float64(len(userInput)) / float64(len(targetText)) * 100.0
-				if progress > 100.0 {
-					progress = 100.0
+				if m.timeLimit > 0 {
+					remaining := m.timeLimit - time.Since(m.engine.StartTime)
+					if remaining < 0 {
+						remaining = 0
+					}
+					b.WriteString(m.theme.Dim.Render(fmt.Sprintf("Time left: %.0fs | Errors: %d | WPM: %.0f", remaining.Seconds(), m.engine.ErrorCount, wpm)))
+				} else {
+					progress := float64(len(userInput)) / float64(len(targetText)) * 100.0
+					if progress > 100.0 {
+						progress = 100.0
+					}
+					b.WriteString(m.theme.Dim.Render(fmt.Sprintf("Progress: %.0f%% | Time: %.0fs | Errors: %d | WPM: %.0f", progress, duration, m.engine.ErrorCount, wpm)))
 				}
-				b.WriteString(m.theme.Dim.Render(fmt.Sprintf("Progress: %.0f%% | Time: %.0fs | Errors: %d | WPM: %.0f", progress, duration, m.engine.ErrorCount, wpm)))
+			} else if m.timeLimit > 0 {
+				b.WriteString(m.theme.Dim.Render(fmt.Sprintf("Type to start the %.0fs timer...", m.timeLimit.Seconds())))
 			} else {
 				b.WriteString(m.theme.Dim.Render("Start typing to begin..."))
 			}

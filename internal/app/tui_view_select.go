@@ -78,6 +78,31 @@ func (m model) renderThemeSelect() string {
 	return b.String()
 }
 
+func (m model) renderModeSelect() string {
+	var b strings.Builder
+
+	b.WriteString(m.theme.Title.Render("⏱  Timed Test"))
+	b.WriteString("\n\n")
+	b.WriteString(m.theme.Dim.Render("Pick a duration or a word count:"))
+	b.WriteString("\n\n")
+
+	for i, mode := range practiceModes() {
+		cursor := "  "
+		style := m.theme.Menu
+		if i == m.modeIndex {
+			cursor = "▶ "
+			style = m.theme.Selected
+		}
+		b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, mode.label)))
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(m.theme.Dim.Render("↑/↓ or j/k to navigate | Enter to start | ESC to cancel"))
+
+	return b.String()
+}
+
 func (m model) renderLanguageSelect() string {
 	var b strings.Builder
 

@@ -14,6 +14,8 @@ func (m model) View() string {
 		return m.renderLanguageSelect()
 	case screenLoadFile:
 		return m.renderLoadFile()
+	case screenModeSelect:
+		return m.renderModeSelect()
 	}
 	return ""
 }

@@ -58,7 +58,7 @@ func initialModel() model {
 	return model{
 		screen:      screenMenu,
 		menuIndex:   0,
-		menuOptions: []string{"Bigrams", "Keywords", "Symbols", "Code Snippets", "Practice Weaknesses", "Load File", "View Stats", "Change Theme", "Change Language", "Toggle Zen Mode", "Quit"},
+		menuOptions: []string{"Bigrams", "Keywords", "Symbols", "Code Snippets", "Timed Test", "Practice Weaknesses", "Load File", "View Stats", "Change Theme", "Change Language", "Toggle Zen Mode", "Quit"},
 		generator:   gen,
 		db:          db,
 		textInput:   ti,
@@ -68,22 +68,43 @@ func initialModel() model {
 	}
 }
 
-func (m *model) generateWeaknessLesson() {
+func (m *model) startGeneratedLesson(lt generator.LessonType, length int) {
+	m.timeLimit = 0
+	m.regen = func() string {
+		return strings.TrimSpace(m.generator.GenerateLesson(lt, length))
+	}
+	m.targetText = m.regen()
+	m.startPractice()
+}
+
+func (m *model) startTimedTest(limit time.Duration) {
+	m.timeLimit = limit
+	m.regen = func() string {
+		return strings.TrimSpace(m.generator.GenerateLesson(generator.TypeWords, 220))
+	}
+	m.targetText = m.regen()
+	m.startPractice()
+}
+
+func (m *model) startWordTest(words int) {
+	m.timeLimit = 0
+	m.regen = func() string {
+		return strings.TrimSpace(m.generator.GenerateLesson(generator.TypeWords, words))
+	}
+	m.targetText = m.regen()
+	m.startPractice()
+}
+
+func (m *model) weaknessText() string {
 	if m.db == nil {
-		m.targetText = m.generator.GenerateLesson(generator.TypeWords, 15)
-		m.targetText = strings.TrimSpace(m.targetText)
-		m.startPractice()
-		return
+		return strings.TrimSpace(m.generator.GenerateLesson(generator.TypeWords, 15))
 	}
 
 	dueKeys, err := m.db.GetDueKeys(10)
 	if err != nil || len(dueKeys) == 0 {
 		weakKeys, err := m.db.GetWeakestKeys(10)
 		if err != nil || len(weakKeys) == 0 {
-			m.targetText = m.generator.GenerateLesson(generator.TypeWords, 15)
-			m.targetText = strings.TrimSpace(m.targetText)
-			m.startPractice()
-			return
+			return strings.TrimSpace(m.generator.GenerateLesson(generator.TypeWords, 15))
 		}
 		dueKeys = weakKeys
 	}
@@ -94,15 +115,19 @@ func (m *model) generateWeaknessLesson() {
 		if total == 0 {
 			continue
 		}
-		errorRate := float64(k.Errors) / total
 		weakList = append(weakList, generator.WeakKey{
 			Key:       k.Key,
-			ErrorRate: errorRate,
+			ErrorRate: float64(k.Errors) / total,
 		})
 	}
 
-	m.targetText = m.generator.GenerateWeaknessLesson(weakList, 20)
-	m.targetText = strings.TrimSpace(m.targetText)
+	return strings.TrimSpace(m.generator.GenerateWeaknessLesson(weakList, 20))
+}
+
+func (m *model) generateWeaknessLesson() {
+	m.timeLimit = 0
+	m.regen = m.weaknessText
+	m.targetText = m.weaknessText()
 	m.startPractice()
 }
 

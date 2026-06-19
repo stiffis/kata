@@ -1,6 +1,8 @@
 package app
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 
@@ -20,6 +22,7 @@ const (
 	screenThemeSelect
 	screenLanguageSelect
 	screenLoadFile
+	screenModeSelect
 )
 
 type model struct {
@@ -30,6 +33,10 @@ type model struct {
 	// Engine handles the typing state
 	engine     *engine.Engine
 	targetText string // Temporary holder for text before engine start
+
+	timeLimit time.Duration
+	regen     func() string
+	modeIndex int
 
 	// File loading
 	textInput textinput.Model

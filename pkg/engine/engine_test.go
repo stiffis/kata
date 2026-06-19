@@ -71,9 +71,12 @@ func TestStatsCalculation(t *testing.T) {
 	target := "abcde"
 	e := New(target)
 
+	for _, char := range target {
+		e.ProcessKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}})
+	}
+
 	e.StartTime = time.Now().Add(-60 * time.Second)
 	e.EndTime = time.Now()
-	e.IsFinished = true
 
 	wpm, accuracy, _ := e.GetStats()
 

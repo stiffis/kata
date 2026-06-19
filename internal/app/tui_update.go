@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -13,12 +14,29 @@ import (
 	"kata/pkg/themes"
 )
 
+type tickMsg time.Time
+
+func tickCmd() tea.Cmd {
+	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
 func (m model) Init() tea.Cmd {
-	return nil
+	return tickCmd()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tickMsg:
+		if m.screen == screenPractice && m.timeLimit > 0 && m.engine != nil &&
+			!m.engine.IsFinished && !m.engine.StartTime.IsZero() {
+			if time.Since(m.engine.StartTime) >= m.timeLimit {
+				m.engine.Finish()
+				m.saveSession()
+			}
+		}
+		return m, tickCmd()
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -66,6 +84,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleLanguageSelectInput(msg)
 		case screenLoadFile:
 			return m.handleLoadFileInput(msg)
+		case screenModeSelect:
+			return m.handleModeSelectInput(msg)
 		}
 	}
 	return m, nil
@@ -94,27 +114,27 @@ func (m model) handleMenuInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) selectMenuItem() (tea.Model, tea.Cmd) {
 	switch m.menuIndex {
-	case 0: // Bigrams
-		m.targetText = strings.TrimSpace(m.generator.GenerateLesson(generator.TypeBigrams, 20))
-		m.startPractice()
-	case 1: // Keywords
-		m.targetText = strings.TrimSpace(m.generator.GenerateLesson(generator.TypeWords, 15))
-		m.startPractice()
-	case 2: // Symbols
-		m.targetText = strings.TrimSpace(m.generator.GenerateLesson(generator.TypeSymbols, 10))
-		m.startPractice()
-	case 3: // Code Snippets
-		m.targetText = strings.TrimSpace(m.generator.GenerateLesson(generator.TypeCode, 2))
-		m.startPractice()
-	case 4: // Practice Weaknesses
+	case 0:
+		m.startGeneratedLesson(generator.TypeBigrams, 20)
+	case 1:
+		m.startGeneratedLesson(generator.TypeWords, 15)
+	case 2:
+		m.startGeneratedLesson(generator.TypeSymbols, 10)
+	case 3:
+		m.startGeneratedLesson(generator.TypeCode, 2)
+	case 4:
+		m.screen = screenModeSelect
+		m.modeIndex = 0
+		return m, nil
+	case 5:
 		m.generateWeaknessLesson()
-	case 5: // Load File
+	case 6:
 		m.screen = screenLoadFile
 		m.textInput.Focus()
 		m.textInput.SetValue("")
 		m.errMsg = ""
 		return m, textinput.Blink
-	case 6: // View Stats
+	case 7:
 		m.screen = screenStats
 		m.statsReady = false
 		if m.width > 0 && m.height > 0 {
@@ -124,22 +144,21 @@ func (m model) selectMenuItem() (tea.Model, tea.Cmd) {
 			m.statsReady = true
 		}
 		return m, nil
-	case 7: // Change Theme
+	case 8:
 		m.screen = screenThemeSelect
 		m.themeIndex = 0
 		return m, nil
-	case 8: // Change Language
+	case 9:
 		m.screen = screenLanguageSelect
-		// Reuse themeIndex for language list navigation as it's just an int
 		m.themeIndex = 0
 		return m, nil
-	case 9: // Toggle Zen Mode
+	case 10:
 		m.config.ZenMode = !m.config.ZenMode
 		if err := config.Save(m.config); err != nil {
 			fmt.Printf("Warning: Could not save config: %v\n", err)
 		}
 		return m, nil
-	case 10: // Quit
+	case 11:
 		if m.db != nil {
 			m.db.Close()
 		}
@@ -150,15 +169,24 @@ func (m model) selectMenuItem() (tea.Model, tea.Cmd) {
 
 func (m model) handlePracticeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.engine.IsFinished {
-		if msg.String() == "q" || msg.String() == "ctrl+c" {
+		switch msg.String() {
+		case "q", "ctrl+c":
 			if m.db != nil {
 				m.db.Close()
 			}
 			return m, tea.Quit
-		}
-		if msg.String() == "enter" {
+		case "enter":
 			m.screen = screenMenu
 			m.menuIndex = 0
+			return m, nil
+		case "r", "tab":
+			m.startPractice()
+			return m, nil
+		case "n":
+			if m.regen != nil {
+				m.targetText = m.regen()
+			}
+			m.startPractice()
 			return m, nil
 		}
 		return m, nil
@@ -271,6 +299,68 @@ func (m model) handleLanguageSelectInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.screen = screenMenu
+		return m, nil
+	}
+	return m, nil
+}
+
+type practiceMode struct {
+	label   string
+	timed   bool
+	seconds int
+	words   int
+}
+
+func practiceModes() []practiceMode {
+	return []practiceMode{
+		{label: "15 seconds", timed: true, seconds: 15},
+		{label: "30 seconds", timed: true, seconds: 30},
+		{label: "60 seconds", timed: true, seconds: 60},
+		{label: "10 words", words: 10},
+		{label: "25 words", words: 25},
+		{label: "50 words", words: 50},
+	}
+}
+
+func (m *model) applyMode(i int) {
+	modes := practiceModes()
+	if i < 0 || i >= len(modes) {
+		return
+	}
+	mode := modes[i]
+	if mode.timed {
+		m.startTimedTest(time.Duration(mode.seconds) * time.Second)
+	} else {
+		m.startWordTest(mode.words)
+	}
+}
+
+func (m model) handleModeSelectInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	maxIndex := len(practiceModes()) - 1
+
+	switch msg.String() {
+	case "ctrl+c", "q":
+		if m.db != nil {
+			m.db.Close()
+		}
+		return m, tea.Quit
+	case "esc":
+		m.screen = screenMenu
+		return m, nil
+	case "up", "k":
+		if m.modeIndex > 0 {
+			m.modeIndex--
+		} else {
+			m.modeIndex = maxIndex
+		}
+	case "down", "j":
+		if m.modeIndex < maxIndex {
+			m.modeIndex++
+		} else {
+			m.modeIndex = 0
+		}
+	case "enter":
+		m.applyMode(m.modeIndex)
 		return m, nil
 	}
 	return m, nil

@@ -314,8 +314,6 @@ func (db *DB) UpdateKeyStats(target, input string) error {
 			return err
 		}
 
-		// SRS quality reflects recall in THIS session, not the lifetime
-		// average, so a key that starts failing again resurfaces quickly.
 		sessionAttempts := stats.errors + stats.successes
 		sessionAccuracy := 1.0
 		if sessionAttempts > 0 {

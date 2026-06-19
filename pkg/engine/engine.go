@@ -13,6 +13,9 @@ type Engine struct {
 	EndTime    time.Time
 	IsFinished bool
 	ErrorCount int
+
+	TotalKeystrokes int
+	RawErrors       int
 }
 
 func New(targetText string) *Engine {
@@ -102,13 +105,26 @@ func (e *Engine) updateErrorsIncremental(oldLength int) {
 	}
 
 	for i := oldLength; i < newLength; i++ {
+		e.TotalKeystrokes++
 		if i < len(e.TargetText) {
 			if e.UserInput[i] != e.TargetText[i] {
 				e.ErrorCount++
+				e.RawErrors++
 			}
 		} else {
 			e.ErrorCount++
+			e.RawErrors++
 		}
+	}
+}
+
+func (e *Engine) Finish() {
+	if e.IsFinished {
+		return
+	}
+	e.IsFinished = true
+	if e.EndTime.IsZero() {
+		e.EndTime = time.Now()
 	}
 }
 
@@ -158,19 +174,15 @@ func (e *Engine) GetStats() (wpm float64, accuracy float64, duration float64) {
 		duration = 1 // minimal duration
 	}
 
-	// Calculate WPM based on correct characters typed, not total target length
-	// Standard: 1 word = 5 characters
-	correctChars := max(0, len(e.TargetText)-e.ErrorCount)
+	correctChars := max(0, len(e.UserInput)-e.ErrorCount)
 	words := float64(correctChars) / 5.0
 	wpm = (words / duration) * 60.0
 
-	// Calculate accuracy based on actual attempts made
-	totalAttempts := len(e.UserInput)
-	if totalAttempts == 0 {
+	if e.TotalKeystrokes == 0 {
 		accuracy = 100.0
 	} else {
-		correctAttempts := max(0, totalAttempts-e.ErrorCount)
-		accuracy = float64(correctAttempts) / float64(totalAttempts) * 100.0
+		correct := max(0, e.TotalKeystrokes-e.RawErrors)
+		accuracy = float64(correct) / float64(e.TotalKeystrokes) * 100.0
 	}
 
 	return wpm, accuracy, duration
