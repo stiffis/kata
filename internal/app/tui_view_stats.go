@@ -73,7 +73,7 @@ func (m model) buildStatsContent() string {
 		asciigraph.Width(60),
 		asciigraph.Caption("Accuracy %"))
 
-	b.WriteString(menuStyle.Render(accGraph))
+	b.WriteString(m.theme.Stats.Render(accGraph))
 	b.WriteString("\n")
 	b.WriteString(separator)
 	b.WriteString("\n\n")

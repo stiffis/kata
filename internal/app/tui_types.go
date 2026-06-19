@@ -3,19 +3,12 @@ package app
 import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/charmbracelet/lipgloss"
 
 	"kata/pkg/config"
 	"kata/pkg/engine"
 	"kata/pkg/generator"
 	"kata/pkg/stats"
 	"kata/pkg/themes"
-)
-
-var (
-	// Deprecated: These will be replaced by theme system
-	// Kept for backward compatibility if any legacy code remains
-	menuStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
 )
 
 type screen int

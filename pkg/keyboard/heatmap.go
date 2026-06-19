@@ -17,7 +17,7 @@ var keyboardLayout = [][]string{
 
 func GetErrorRate(key string, keyStats []stats.KeyStat) (float64, bool) {
 	for _, stat := range keyStats {
-		if strings.ToLower(stat.Key) == strings.ToLower(key) {
+		if strings.EqualFold(stat.Key, key) {
 			total := stat.Errors + stat.Successes
 			if total == 0 {
 				return 0, false
@@ -86,32 +86,6 @@ func RenderHeatmap(keyStats []stats.KeyStat, theme lipgloss.Style) string {
 	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")).Render("●") + " 40%+  ")
 	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("●") + " no data")
 	b.WriteString("\n")
-
-	return b.String()
-}
-
-func RenderCompactHeatmap(keyStats []stats.KeyStat) string {
-	var b strings.Builder
-
-	for rowIdx, row := range keyboardLayout {
-		indent := strings.Repeat(" ", rowIdx)
-		b.WriteString(indent)
-
-		for _, key := range row {
-			rate, hasData := GetErrorRate(key, keyStats)
-
-			var style lipgloss.Style
-			if !hasData {
-				style = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-			} else {
-				color := GetColorForRate(rate)
-				style = lipgloss.NewStyle().Foreground(color).Bold(true)
-			}
-
-			b.WriteString(style.Render("█"))
-		}
-		b.WriteString("\n")
-	}
 
 	return b.String()
 }

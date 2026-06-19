@@ -3,6 +3,7 @@ package generator
 import (
 	"math/rand"
 	"os"
+	"slices"
 	"strings"
 	"time"
 )
@@ -380,15 +381,15 @@ func (g *Generator) GenerateWeaknessLesson(weakKeys []WeakKey, length int) strin
 	case LangGerman:
 		sourcePool = germanWords
 	case LangPython:
-		sourcePool = append(pythonKeywords, pythonSymbols...)
+		sourcePool = slices.Concat(pythonKeywords, pythonSymbols)
 	case LangCpp:
-		sourcePool = append(cppKeywords, cppSymbols...)
+		sourcePool = slices.Concat(cppKeywords, cppSymbols)
 	case LangJavascript:
-		sourcePool = append(jsKeywords, jsSymbols...)
+		sourcePool = slices.Concat(jsKeywords, jsSymbols)
 	case LangRust:
-		sourcePool = append(rustKeywords, rustSymbols...)
+		sourcePool = slices.Concat(rustKeywords, rustSymbols)
 	default: // Go
-		sourcePool = append(goKeywords, goSymbols...)
+		sourcePool = slices.Concat(goKeywords, goSymbols)
 	}
 
 	var wordPool []string
