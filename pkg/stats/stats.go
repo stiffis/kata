@@ -200,7 +200,7 @@ func (db *DB) GetRecentSessions(limit int) ([]Session, error) {
 
 func (db *DB) GetAverageWPM() (float64, error) {
 	var avg float64
-	query := `SELECT AVG(wpm) FROM sessions`
+	query := `SELECT COALESCE(AVG(wpm), 0) FROM sessions`
 	err := db.conn.QueryRow(query).Scan(&avg)
 	return avg, err
 }
@@ -314,17 +314,17 @@ func (db *DB) UpdateKeyStats(target, input string) error {
 			return err
 		}
 
-		newErrors := existingKey.Errors + stats.errors
-		newSuccesses := existingKey.Successes + stats.successes
-		totalAttempts := newErrors + newSuccesses
-		accuracy := 0.0
-		if totalAttempts > 0 {
-			accuracy = float64(newSuccesses) / float64(totalAttempts)
+		// SRS quality reflects recall in THIS session, not the lifetime
+		// average, so a key that starts failing again resurfaces quickly.
+		sessionAttempts := stats.errors + stats.successes
+		sessionAccuracy := 1.0
+		if sessionAttempts > 0 {
+			sessionAccuracy = float64(stats.successes) / float64(sessionAttempts)
 		}
 
-		quality := accuracyToQuality(accuracy)
-		existingKey.Errors = newErrors
-		existingKey.Successes = newSuccesses
+		quality := accuracyToQuality(sessionAccuracy)
+		existingKey.Errors += stats.errors
+		existingKey.Successes += stats.successes
 		existingKey.UpdateSM2(quality)
 
 		_, err = stmt.Exec(key, stats.errors, stats.successes, now, stats.errors, stats.successes, now)
@@ -343,20 +343,6 @@ func (db *DB) UpdateKeyStats(target, input string) error {
 	}
 
 	return tx.Commit()
-}
-
-func (db *DB) upsertKeyStats(key string, errors, successes int) error {
-	query := `
-	INSERT INTO key_stats (key, errors, successes, last_practiced)
-	VALUES (?, ?, ?, ?)
-	ON CONFLICT(key) DO UPDATE SET
-		errors = errors + ?,
-		successes = successes + ?,
-		last_practiced = ?
-	`
-	now := time.Now()
-	_, err := db.conn.Exec(query, key, errors, successes, now, errors, successes, now)
-	return err
 }
 
 func (db *DB) GetWeakestKeys(limit int) ([]KeyStat, error) {
@@ -386,6 +372,10 @@ func (db *DB) GetWeakestKeys(limit int) ([]KeyStat, error) {
 }
 
 func (db *DB) GetDueKeys(limit int) ([]KeyStat, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+
 	query := `
 	SELECT key, errors, successes, last_practiced, interval, repetitions, ease_factor
 	FROM key_stats
