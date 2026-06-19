@@ -115,4 +115,3 @@ func RenderCompactHeatmap(keyStats []stats.KeyStat) string {
 
 	return b.String()
 }
-
