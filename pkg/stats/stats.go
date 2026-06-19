@@ -215,20 +215,20 @@ func AnalyzeErrors(target, input string) ErrorAnalysis {
 		BigramErrors: make(map[string]int),
 	}
 
-	minLen := len(input)
-	if minLen > len(target) {
-		minLen = len(target)
+	targetRunes := []rune(target)
+	inputRunes := []rune(input)
+
+	minLen := len(inputRunes)
+	if minLen > len(targetRunes) {
+		minLen = len(targetRunes)
 	}
 
 	for i := 0; i < minLen; i++ {
-		targetChar := string(target[i])
-		inputChar := string(input[i])
-
-		if targetChar != inputChar {
-			analysis.CharErrors[targetChar]++
+		if targetRunes[i] != inputRunes[i] {
+			analysis.CharErrors[string(targetRunes[i])]++
 
 			if i > 0 {
-				bigram := string(target[i-1]) + targetChar
+				bigram := string(targetRunes[i-1]) + string(targetRunes[i])
 				analysis.BigramErrors[bigram]++
 			}
 		}
